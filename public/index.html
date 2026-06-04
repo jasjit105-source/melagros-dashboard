@@ -1,0 +1,700 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Melagros Centro Dashboard</title>
+<style>
+:root{--bg:#f0f2f5;--card:#fff;--border:#e2e6ed;--text:#1a1d23;--muted:#5f6b7a;--faint:#9aa3b0;--blue:#2563eb;--blue-bg:#eff4ff;--green:#16a34a;--green-bg:#ecfdf3;--red:#dc2626;--red-bg:#fef2f2;--orange:#ea580c;--orange-bg:#fff4ed;--purple:#7c3aed;--purple-bg:#f5f0ff;--amber:#b45309;--amber-bg:#fffbeb;--r:12px;--sh:0 1px 3px rgba(0,0,0,.06)}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+.app{max-width:1400px;margin:0 auto;padding:16px 20px}
+.hdr{display:flex;align-items:center;gap:12px;margin-bottom:16px;flex-wrap:wrap}
+.hdr h1{font-size:22px;font-weight:800}.hdr h1 span{color:var(--blue)}
+.hdr .sub{font-size:12px;color:var(--muted);margin-left:auto}
+.tabs{display:flex;gap:2px;background:var(--card);border:1px solid var(--border);border-radius:var(--r);padding:3px;margin-bottom:16px;overflow-x:auto}
+.tab{padding:8px 16px;border-radius:9px;font-size:12px;font-weight:600;color:var(--muted);cursor:pointer;border:none;background:none;white-space:nowrap;transition:.15s}
+.tab:hover{color:var(--text);background:#f8f9fb}
+.tab.active{background:var(--blue);color:#fff}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:16px}
+.kpi{background:var(--card);border:1px solid var(--border);border-radius:var(--r);padding:14px 16px;box-shadow:var(--sh)}
+.kpi .val{font-family:'SF Mono',monospace;font-size:22px;font-weight:800;line-height:1.1}
+.kpi .lbl{font-size:10px;color:var(--muted);margin-top:2px;text-transform:uppercase;letter-spacing:.5px}
+.kpi.green .val{color:var(--green)}.kpi.blue .val{color:var(--blue)}.kpi.red .val{color:var(--red)}.kpi.purple .val{color:var(--purple)}.kpi.orange .val{color:var(--orange)}.kpi.amber .val{color:var(--amber)}
+.panel{background:var(--card);border:1px solid var(--border);border-radius:var(--r);box-shadow:var(--sh);margin-bottom:16px;overflow:hidden}
+.panel-hdr{padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px}
+.panel-hdr h3{font-size:15px;font-weight:700}
+.panel-hdr .actions{display:flex;gap:6px;align-items:center}
+.tbl-wrap{overflow-x:auto;max-height:calc(100vh - 340px)}
+table{width:100%;border-collapse:collapse;font-size:12px}
+thead th{position:sticky;top:0;z-index:5;background:#f8f9fb;border-bottom:2px solid var(--border);padding:8px 12px;text-align:left;font-weight:600;color:var(--muted);font-size:10px;text-transform:uppercase;white-space:nowrap}
+tbody td{padding:8px 12px;border-bottom:1px solid var(--border);white-space:nowrap}
+tbody tr:hover{background:#f8fafd}
+.mono{font-family:'SF Mono',monospace;font-size:11px}
+.bold{font-weight:700}
+.right{text-align:right}
+.green-text{color:var(--green)}.red-text{color:var(--red)}.blue-text{color:var(--blue)}.purple-text{color:var(--purple)}
+.badge{display:inline-block;font-size:9px;padding:2px 8px;border-radius:6px;font-weight:700}
+.badge-green{background:var(--green-bg);color:var(--green)}.badge-blue{background:var(--blue-bg);color:var(--blue)}
+.badge-red{background:var(--red-bg);color:var(--red)}.badge-orange{background:var(--orange-bg);color:var(--orange)}
+.badge-purple{background:var(--purple-bg);color:var(--purple)}.badge-amber{background:var(--amber-bg);color:var(--amber)}
+.btn{padding:7px 16px;border:1px solid var(--border);border-radius:8px;background:var(--card);font-family:inherit;font-size:12px;font-weight:600;cursor:pointer;transition:.15s}
+.btn:hover{background:#f1f5f9}
+.btn-blue{background:var(--blue);color:#fff;border-color:var(--blue)}.btn-blue:hover{background:#1d4ed8}
+.btn-green{background:var(--green);color:#fff;border-color:var(--green)}.btn-green:hover{background:#15803d}
+.btn-red{background:var(--red);color:#fff;border-color:var(--red)}.btn-red:hover{background:#b91c1c}
+.btn-purple{background:var(--purple);color:#fff;border-color:var(--purple)}.btn-purple:hover{background:#6d28d9}
+.btn-sm{padding:4px 10px;font-size:11px}
+.form-row{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;padding:14px 18px}
+.form-group{display:flex;flex-direction:column;gap:3px;min-width:120px;flex:1}
+.form-group label{font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase}
+.form-group input,.form-group select{padding:7px 10px;border:1px solid var(--border);border-radius:8px;font-family:inherit;font-size:13px;outline:none}
+.form-group input:focus,.form-group select:focus{border-color:var(--blue);box-shadow:0 0 0 2px rgba(37,99,235,.1)}
+.form-group input[type=number]{font-family:'SF Mono',monospace}
+.empty{text-align:center;padding:40px;color:var(--muted)}
+.empty .icon{font-size:28px;margin-bottom:6px}
+.status{font-size:12px;color:var(--muted);padding:8px 18px}
+.date-nav{display:flex;align-items:center;gap:8px}
+.date-nav input[type=date]{padding:6px 10px;border:1px solid var(--border);border-radius:8px;font-family:inherit;font-size:13px;font-weight:600}
+.sync-indicator{display:inline-flex;align-items:center;gap:4px;font-size:11px;padding:4px 10px;border-radius:6px}
+.sync-ok{background:var(--green-bg);color:var(--green)}.sync-pending{background:var(--amber-bg);color:var(--amber)}
+.store-tag{display:inline-block;padding:2px 8px;border-radius:5px;font-size:10px;font-weight:700}
+.store-cercu{background:#ede9fe;color:#7c3aed}.store-leona{background:#fce7f3;color:#db2777}
+.loading{text-align:center;padding:30px;color:var(--muted);font-size:13px}
+@media(max-width:768px){.form-row{flex-direction:column}.form-group{min-width:100%}.kpis{grid-template-columns:repeat(2,1fr)}}
+</style>
+</head>
+<body>
+<div class="app" id="app"></div>
+<script>
+const API = '/api';
+const fmt = n => '$' + (Number(n)||0).toLocaleString('en-US', {minimumFractionDigits: 0, maximumFractionDigits: 0});
+const fmtN = n => (Number(n)||0).toLocaleString('en-US');
+const today = () => new Date().toISOString().slice(0,10);
+
+const i18n = {
+  es: {
+    overview:'Resumen', daily_sales:'Ventas Diarias', caja:'Caja', safe:'Caja Fuerte',
+    payroll:'Nomina', loans:'Prestamos', valle:'Valle',
+    today_sales:'Ventas de Hoy', deposited:'Depositado', caja_balance:'Saldo Caja',
+    stores_reporting:'Tiendas Reportando', today_by_store:'Ventas de Hoy por Tienda',
+    sync_corte:'Sincronizar Corte', syncing:'Sincronizando...',
+    no_sales:'Sin datos de ventas para', last7:'Tendencia Ultimos 7 Dias',
+    date:'Fecha', day:'Dia', total:'Total', source:'Fuente',
+    recent_caja:'Transacciones Recientes de Caja',
+    category:'Categoria', account:'Cuenta', description:'Descripcion',
+    income:'Ingreso', expense:'Gasto', balance:'Saldo',
+    step1:'Paso 1: Sincronizar del Corte', step1_sub:'Auto-llena CB, Ventas, Total, Tarjeta, Transferencia del POS',
+    sync_for:'Sincronizar Corte para', no_corte:'No hay datos del Corte para',
+    from_corte:'del Corte', manual:'Manual',
+    cb:'CB', sales:'Ventas', other:'Otro', expenses:'Gastos', card:'Tarjeta',
+    transfer:'Transferencia', abono:'Abono', cb_next:'CB Sig.',
+    step2:'Paso 2: Ingresar Depositos (Abonos)', step2_sub:'La chica ingresa cuanto efectivo se deposito + ajustes manuales',
+    other_sales:'Otras Ventas', cash_deposit:'Deposito efectivo',
+    save:'Guardar', sales_history:'Historial de Ventas',
+    wholesale:'Mayoreo', deposit_col:'Deposito',
+    current_balance:'Saldo Actual', income_entries:'Entradas Ingreso', expense_entries:'Entradas Gasto',
+    new_transaction:'Nueva Transaccion', select:'Seleccionar...', caja_ledger:'Libro de Caja',
+    safe_transaction:'Transaccion Caja Fuerte', safe_balance:'Saldo Caja Fuerte',
+    deposit:'Deposito', withdrawal:'Retiro', safe_ledger:'Libro Caja Fuerte',
+    record_payroll:'Registrar Nomina', pay_date:'Fecha Pago', employee:'Empleado',
+    store:'Tienda', amount:'Monto', notes:'Notas', payroll_history:'Historial Nomina',
+    jj_balance:'Saldo JJ Ahorro', record_tx:'Registrar Transaccion', loan_ledger:'Libro Prestamos',
+    valle_balance:'Saldo Proyecto Valle', valle_ledger:'Libro Valle Control',
+    today_btn:'Hoy', optional:'opcional',
+    autofill:'Auto-llenar del Corte',
+  },
+  en: {
+    overview:'Overview', daily_sales:'Daily Sales', caja:'Caja', safe:'Safe',
+    payroll:'Payroll', loans:'Loans', valle:'Valle',
+    today_sales:"Today's Sales", deposited:'Deposited', caja_balance:'Caja Balance',
+    stores_reporting:'Stores Reporting', today_by_store:"Today's Sales by Store",
+    sync_corte:'Sync from Corte', syncing:'Syncing...',
+    no_sales:'No sales data for', last7:'Last 7 Days Trend',
+    date:'Date', day:'Day', total:'Total', source:'Source',
+    recent_caja:'Recent Caja Transactions',
+    category:'Category', account:'Account', description:'Description',
+    income:'Income', expense:'Expense', balance:'Balance',
+    step1:'Step 1: Sync from Corte', step1_sub:'Auto-fills CB, Sales, Total, Card, Transfer from POS register',
+    sync_for:'Sync Corte for', no_corte:'No Corte data synced for',
+    from_corte:'From Corte', manual:'Manual',
+    cb:'CB', sales:'Sales', other:'Other', expenses:'Expenses', card:'Card',
+    transfer:'Transfer', abono:'Abono', cb_next:'CB Next',
+    step2:'Step 2: Enter Deposits (Abonos)', step2_sub:'Girl enters how much cash was deposited + any manual adjustments',
+    other_sales:'Other Sales', cash_deposit:'Cash deposit',
+    save:'Save', sales_history:'Sales History',
+    wholesale:'Wholesale', deposit_col:'Deposit',
+    current_balance:'Current Balance', income_entries:'Income Entries', expense_entries:'Expense Entries',
+    new_transaction:'New Transaction', select:'Select...', caja_ledger:'Caja Ledger',
+    safe_transaction:'Safe Transaction', safe_balance:'Safe Balance',
+    deposit:'Deposit', withdrawal:'Withdrawal', safe_ledger:'Safe Ledger',
+    record_payroll:'Record Payroll', pay_date:'Pay Date', employee:'Employee',
+    store:'Store', amount:'Amount', notes:'Notes', payroll_history:'Payroll History',
+    jj_balance:'JJ Ahorro Balance', record_tx:'Record Transaction', loan_ledger:'Loan Ledger',
+    valle_balance:'Valle Project Balance', valle_ledger:'Valle Control Ledger',
+    today_btn:'Today', optional:'optional',
+    autofill:'Auto-fill from Corte',
+  }
+};
+
+let lang = localStorage.getItem('melagros_lang') || 'es';
+function t(key) { return (i18n[lang] || i18n.es)[key] || key; }
+function setLang(l) { lang = l; localStorage.setItem('melagros_lang', l); render(); }
+
+let state = {
+  tab: 'overview',
+  date: today(),
+  dailySales: [],
+  caja: { rows: [], balance: 0 },
+  cajaFuerte: { rows: [], balance: 0 },
+  nomina: [],
+  prestamos: { rows: [], balance: 0 },
+  valle: { rows: [], balance: 0 },
+  categories: [],
+  subAccounts: [],
+  loading: false,
+  syncing: false,
+};
+
+async function api(endpoint, params = {}) {
+  const qs = new URLSearchParams(params).toString();
+  const res = await fetch(API + '/' + endpoint + (qs ? '?' + qs : ''));
+  return res.json();
+}
+async function post(endpoint, body) {
+  const res = await fetch(API + '/' + endpoint, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
+  });
+  return res.json();
+}
+
+async function loadData(tab) {
+  state.loading = true; render();
+  try {
+    const d = state.date;
+    const weekAgo = new Date(new Date(d).getTime() - 30*86400000).toISOString().slice(0,10);
+    if (tab === 'overview' || tab === 'daily_sales') {
+      state.dailySales = await api('data', { table: 'daily_sales', from: weekAgo, to: d });
+    }
+    if (tab === 'overview' || tab === 'caja') {
+      state.caja = await api('data', { table: 'caja', from: weekAgo, to: d, limit: 200 });
+    }
+    if (tab === 'caja_fuerte') state.cajaFuerte = await api('data', { table: 'caja_fuerte', limit: 100 });
+    if (tab === 'nomina') state.nomina = await api('data', { table: 'nomina' });
+    if (tab === 'prestamos') state.prestamos = await api('data', { table: 'prestamos' });
+    if (tab === 'valle') state.valle = await api('data', { table: 'valle_control' });
+    if (tab === 'caja') state.categories = await api('data', { table: 'categories' });
+  } catch (e) { console.error('Load error:', e); }
+  state.loading = false; render();
+}
+
+async function loadSubAccounts(cat) {
+  state.subAccounts = await api('data', { table: 'sub_accounts', category: cat });
+  render();
+}
+
+async function syncCorte() {
+  state.syncing = true; render();
+  try {
+    const result = await post('corte-sync', { fecha: state.date });
+    alert('Corte synced for ' + state.date + ': ' + (result.synced || 0) + ' stores updated');
+    await loadData('daily_sales');
+  } catch (e) { alert('Sync error: ' + e.message); }
+  state.syncing = false; render();
+}
+
+async function saveCaja(form) {
+  const data = Object.fromEntries(new FormData(form));
+  data.action = 'save_caja';
+  await post('save', data);
+  form.reset();
+  await loadData('caja');
+}
+
+async function saveCajaFuerte(form) {
+  const data = Object.fromEntries(new FormData(form));
+  data.action = 'save_caja_fuerte';
+  await post('save', data);
+  form.reset();
+  await loadData('caja_fuerte');
+}
+
+async function saveDailySales(form) {
+  const data = Object.fromEntries(new FormData(form));
+  data.action = 'save_daily_sales';
+  await post('save', data);
+  form.reset();
+  await loadData('daily_sales');
+}
+
+async function saveNomina(form) {
+  const data = Object.fromEntries(new FormData(form));
+  data.action = 'save_nomina';
+  await post('save', data);
+  form.reset();
+  await loadData('nomina');
+}
+
+async function savePrestamo(form) {
+  const data = Object.fromEntries(new FormData(form));
+  data.action = 'save_prestamo';
+  await post('save', data);
+  form.reset();
+  await loadData('prestamos');
+}
+
+async function saveValle(form) {
+  const data = Object.fromEntries(new FormData(form));
+  data.action = 'save_valle';
+  await post('save', data);
+  form.reset();
+  await loadData('valle');
+}
+
+function setTab(t) { state.tab = t; loadData(t); }
+function setDate(d) { state.date = d; loadData(state.tab); }
+
+function storeTag(store) {
+  const cls = store.toLowerCase().includes('circ') ? 'store-cercu' : 'store-leona';
+  return `<span class="store-tag ${cls}">${store}</span>`;
+}
+
+function renderOverview() {
+  const sales = state.dailySales.filter(r => r.sale_date?.slice(0,10) === state.date);
+  const totalVenta = sales.reduce((a,r) => a + Number(r.total_venta||0), 0);
+  const totalDeposito = sales.reduce((a,r) => a + Number(r.deposito||0), 0);
+
+  const last7 = state.dailySales.filter(r => {
+    const d = new Date(r.sale_date);
+    const ref = new Date(state.date);
+    return d <= ref && d >= new Date(ref.getTime() - 7*86400000);
+  });
+  const dailyTotals = {};
+  last7.forEach(r => {
+    const d = r.sale_date.slice(0,10);
+    if (!dailyTotals[d]) dailyTotals[d] = 0;
+    dailyTotals[d] += Number(r.total_venta||0);
+  });
+
+  return `
+    <div class="kpis">
+      <div class="kpi green"><div class="val">${fmt(totalVenta)}</div><div class="lbl">${t('today_sales')}</div></div>
+      <div class="kpi blue"><div class="val">${fmt(totalDeposito)}</div><div class="lbl">${t('deposited')}</div></div>
+      <div class="kpi purple"><div class="val">${fmt(state.caja.balance)}</div><div class="lbl">${t('caja_balance')}</div></div>
+      <div class="kpi amber"><div class="val">${sales.length}</div><div class="lbl">${t('stores_reporting')}</div></div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-hdr">
+        <h3>${t('today_by_store')}</h3>
+        <div class="actions">
+          <button class="btn btn-purple btn-sm" onclick="syncCorte()" ${state.syncing?'disabled':''}>
+            ${state.syncing ? t('syncing') : '⚡ ' + t('sync_corte')}
+          </button>
+        </div>
+      </div>
+      ${sales.length ? `
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>${t('store')}</th><th class="right">${t('cb')}</th><th class="right">${t('sales')}</th><th class="right">${t('total')}</th><th class="right">${t('abono')}</th><th class="right">${t('card')}</th><th class="right">${t('transfer')}</th><th class="right">${t('expenses')}</th><th class="right">${t('cb_next')}</th><th>${t('source')}</th></tr></thead>
+          <tbody>${sales.map(r => `
+            <tr>
+              <td>${storeTag(r.store)}</td>
+              <td class="right mono">${fmtN(r.cb)}</td>
+              <td class="right mono bold green-text">${fmt(r.venta)}</td>
+              <td class="right mono bold">${fmt(r.total_venta)}</td>
+              <td class="right mono blue-text">${fmt(r.deposito)}</td>
+              <td class="right mono">${fmt(r.tarjeta)}</td>
+              <td class="right mono purple-text">${fmt(r.mayoreo)}</td>
+              <td class="right mono red-text">${fmt(r.gastos)}</td>
+              <td class="right mono">${fmtN(r.cb_next)}</td>
+              <td><span class="badge ${r.source==='corte'?'badge-purple':'badge-blue'}">${r.source||'manual'}</span></td>
+            </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>` : `<div class="empty"><div class="icon">📊</div><p>${t('no_sales')} ${state.date}</p><p style="margin-top:8px"><button class="btn btn-purple" onclick="syncCorte()">⚡ ${t('sync_corte')}</button></p></div>`}
+    </div>
+
+    <div class="panel">
+      <div class="panel-hdr"><h3>${t('last7')}</h3></div>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>${t('date')}</th><th>${t('day')}</th>${['Circunvalacion','Leona Vicario'].map(s=>`<th class="right">${s}</th>`).join('')}<th class="right">${t('total')}</th></tr></thead>
+          <tbody>${Object.entries(dailyTotals).sort((a,b)=>b[0].localeCompare(a[0])).map(([d,t]) => {
+            const dayName = new Date(d+'T12:00:00').toLocaleDateString(lang==='es'?'es':'en',{weekday:'short'});
+            const byStore = last7.filter(r=>r.sale_date.slice(0,10)===d);
+            const cercu = byStore.find(r=>r.store.includes('irc'))?.total_venta || 0;
+            const leona = byStore.find(r=>r.store.includes('eona'))?.total_venta || 0;
+            return `<tr><td class="bold">${d}</td><td>${dayName}</td><td class="right mono">${fmt(cercu)}</td><td class="right mono">${fmt(leona)}</td><td class="right mono bold green-text">${fmt(t)}</td></tr>`;
+          }).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-hdr"><h3>${t('recent_caja')}</h3></div>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>${t('date')}</th><th>${t('category')}</th><th>${t('account')}</th><th>${t('description')}</th><th class="right">${t('income')}</th><th class="right">${t('expense')}</th><th class="right">${t('balance')}</th></tr></thead>
+          <tbody>${(state.caja.rows||[]).slice(0,10).map(r => `
+            <tr>
+              <td class="mono">${r.tx_date?.slice(0,10)||''}</td>
+              <td><span class="badge badge-${r.category==='Abono'?'green':r.category==='Gasto'?'red':r.category==='Nomina'?'orange':'blue'}">${r.category}</span></td>
+              <td>${r.account||''}</td>
+              <td>${r.description||''}</td>
+              <td class="right mono green-text">${r.abono>0?fmt(r.abono):''}</td>
+              <td class="right mono red-text">${r.gasto>0?fmt(r.gasto):''}</td>
+              <td class="right mono bold">${fmt(r.saldo)}</td>
+            </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>`;
+}
+
+function renderDailySales() {
+  const todaySales = state.dailySales.filter(r => r.sale_date?.slice(0,10) === state.date);
+  const hasCercu = todaySales.find(r => r.store.includes('irc'));
+  const hasLeona = todaySales.find(r => r.store.includes('eona'));
+
+  return `
+    <div class="panel" style="border-color:var(--purple);border-width:2px">
+      <div class="panel-hdr" style="background:linear-gradient(135deg,#f5f0ff,#fdf4ff)">
+        <div>
+          <h3 style="color:var(--purple)">${t('step1')}</h3>
+          <div style="font-size:11px;color:var(--muted);margin-top:2px">${t('step1_sub')}</div>
+        </div>
+        <div class="actions">
+          <button class="btn btn-purple" onclick="syncCorte()" ${state.syncing?'disabled':''}>
+            ${state.syncing ? t('syncing') : '⚡ ' + t('sync_for') + ' ' + state.date}
+          </button>
+        </div>
+      </div>
+      ${todaySales.length ? `
+      <div style="padding:14px 18px">
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px">
+          ${todaySales.map(r => `
+          <div style="background:${r.store.includes('irc')?'#ede9fe':'#fce7f3'};border-radius:10px;padding:14px">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+              ${storeTag(r.store)}
+              <span class="badge ${r.source==='corte'?'badge-purple':'badge-blue'}">${r.source==='corte'?t('from_corte'):t('manual')}</span>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;font-size:11px">
+              <div><span style="color:var(--muted)">CB:</span> <strong>${fmtN(r.cb)}</strong></div>
+              <div><span style="color:var(--muted)">Sales:</span> <strong class="green-text">${fmt(r.venta)}</strong></div>
+              <div><span style="color:var(--muted)">Total:</span> <strong>${fmt(r.total_venta)}</strong></div>
+              <div><span style="color:var(--muted)">Card:</span> <strong>${fmt(r.tarjeta)}</strong></div>
+              <div><span style="color:var(--muted)">Transfer:</span> <strong>${fmt(r.mayoreo)}</strong></div>
+              <div><span style="color:var(--muted)">Expenses:</span> <strong class="red-text">${fmt(r.gastos)}</strong></div>
+            </div>
+          </div>`).join('')}
+        </div>
+      </div>` : `
+      <div class="empty" style="padding:20px">
+        <p style="color:var(--muted)">${t('no_corte')} ${state.date}</p>
+      </div>`}
+    </div>
+
+    <div class="panel" style="border-color:var(--green);border-width:2px">
+      <div class="panel-hdr" style="background:linear-gradient(135deg,#ecfdf3,#f0fdf4)">
+        <div>
+          <h3 style="color:var(--green)">${t('step2')}</h3>
+          <div style="font-size:11px;color:var(--muted);margin-top:2px">${t('step2_sub')}</div>
+        </div>
+      </div>
+      <form onsubmit="event.preventDefault();saveDailySales(this)" class="form-row">
+        <div class="form-group"><label>${t('date')}</label><input type="date" name="sale_date" value="${state.date}" required></div>
+        <div class="form-group"><label>${t('store')}</label>
+          <select name="store" required><option value="Circunvalacion">Circunvalacion</option><option value="Leona Vicario">Leona Vicario</option></select>
+        </div>
+        <div class="form-group"><label>${t('cb')}</label><input type="number" name="cb" step="1" placeholder="${t('from_corte')}" value="${hasCercu?.cb||''}"></div>
+        <div class="form-group"><label>${t('sales')}</label><input type="number" name="venta" step="1" placeholder="${t('from_corte')}" value="${hasCercu?.venta||''}" required></div>
+        <div class="form-group"><label>${t('other_sales')}</label><input type="number" name="otro_venta" step="1" placeholder="0"></div>
+        <div class="form-group"><label>${t('expenses')}</label><input type="number" name="gastos" step="1" placeholder="0"></div>
+        <div class="form-group" style="border-left:3px solid var(--green);padding-left:8px"><label style="color:var(--green)">Abono 1</label><input type="number" name="abono1" step="1" placeholder="${t('cash_deposit')}" style="border-color:var(--green)"></div>
+        <div class="form-group" style="border-left:3px solid var(--green);padding-left:8px"><label style="color:var(--green)">Abono 2</label><input type="number" name="abono2" step="1" placeholder="0" style="border-color:var(--green)"></div>
+        <div class="form-group" style="border-left:3px solid var(--green);padding-left:8px"><label style="color:var(--green)">Abono 3</label><input type="number" name="abono3" step="1" placeholder="0" style="border-color:var(--green)"></div>
+        <div class="form-group"><label>${t('card')}</label><input type="number" name="tarjeta" step="1" placeholder="${t('from_corte')}" value="${hasCercu?.tarjeta||''}"></div>
+        <div class="form-group"><label>${t('transfer')}</label><input type="number" name="mayoreo" step="1" placeholder="${t('from_corte')}" value="${hasCercu?.mayoreo||''}"></div>
+        <div class="form-group" style="flex:0"><button type="submit" class="btn btn-green" style="padding:10px 24px;font-size:14px">${t('save')}</button></div>
+      </form>
+    </div>
+
+    <div class="panel">
+      <div class="panel-hdr"><h3>${t('sales_history')}</h3></div>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>${t('date')}</th><th>${t('store')}</th><th class="right">${t('cb')}</th><th class="right">${t('sales')}</th><th class="right">${t('other')}</th><th class="right">${t('total')}</th><th class="right">${t('expenses')}</th><th class="right">Abono1</th><th class="right">Abono2</th><th class="right">Abono3</th><th class="right">${t('card')}</th><th class="right">${t('transfer')}</th><th class="right">${t('cb_next')}</th><th class="right">${t('deposit_col')}</th><th>${t('source')}</th></tr></thead>
+          <tbody>${state.dailySales.map(r => `
+            <tr>
+              <td class="mono bold">${r.sale_date?.slice(0,10)||''}</td>
+              <td>${storeTag(r.store)}</td>
+              <td class="right mono">${fmtN(r.cb)}</td>
+              <td class="right mono bold green-text">${fmt(r.venta)}</td>
+              <td class="right mono">${fmt(r.otro_venta)}</td>
+              <td class="right mono bold">${fmt(r.total_venta)}</td>
+              <td class="right mono red-text">${fmt(r.gastos)}</td>
+              <td class="right mono">${fmt(r.abono1)}</td>
+              <td class="right mono">${fmt(r.abono2)}</td>
+              <td class="right mono">${fmt(r.abono3)}</td>
+              <td class="right mono">${fmt(r.tarjeta)}</td>
+              <td class="right mono">${fmt(r.mayoreo)}</td>
+              <td class="right mono blue-text">${fmtN(r.cb_next)}</td>
+              <td class="right mono bold blue-text">${fmt(r.deposito)}</td>
+              <td><span class="badge ${r.source==='corte'?'badge-purple':'badge-blue'}">${r.source||'manual'}</span></td>
+            </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>`;
+}
+
+function renderCaja() {
+  return `
+    <div class="kpis">
+      <div class="kpi green"><div class="val">${fmt(state.caja.balance)}</div><div class="lbl">${t('current_balance')}</div></div>
+      <div class="kpi blue"><div class="val">${(state.caja.rows||[]).filter(r=>r.abono>0).length}</div><div class="lbl">${t('income_entries')}</div></div>
+      <div class="kpi red"><div class="val">${(state.caja.rows||[]).filter(r=>r.gasto>0).length}</div><div class="lbl">${t('expense_entries')}</div></div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-hdr"><h3>${t('new_transaction')}</h3></div>
+      <form onsubmit="event.preventDefault();saveCaja(this)" class="form-row">
+        <div class="form-group"><label>${t('date')}</label><input type="date" name="tx_date" value="${state.date}" required></div>
+        <div class="form-group"><label>${t('category')}</label>
+          <select name="category" required onchange="loadSubAccounts(this.value)">
+            <option value="">${t('select')}</option>
+            ${state.categories.map(c => `<option value="${c}">${c}</option>`).join('')}
+          </select>
+        </div>
+        <div class="form-group"><label>${t('account')}</label>
+          <select name="account">
+            <option value="">${t('select')}</option>
+            ${state.subAccounts.map(s => `<option value="${s}">${s}</option>`).join('')}
+          </select>
+        </div>
+        <div class="form-group" style="flex:2"><label>${t('description')}</label><input type="text" name="description" placeholder="ej. abono tiendas"></div>
+        <div class="form-group"><label>${t('income')}</label><input type="number" name="abono" step="1" placeholder="0"></div>
+        <div class="form-group"><label>${t('expense')}</label><input type="number" name="gasto" step="1" placeholder="0"></div>
+        <div class="form-group" style="flex:0"><button type="submit" class="btn btn-green">${t('save')}</button></div>
+      </form>
+    </div>
+
+    <div class="panel">
+      <div class="panel-hdr"><h3>${t('caja_ledger')}</h3></div>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>${t('date')}</th><th>${t('category')}</th><th>${t('account')}</th><th>${t('description')}</th><th class="right">${t('income')}</th><th class="right">${t('expense')}</th><th class="right">${t('balance')}</th></tr></thead>
+          <tbody>${(state.caja.rows||[]).map(r => `
+            <tr>
+              <td class="mono">${r.tx_date?.slice(0,10)||''}</td>
+              <td><span class="badge badge-${r.category==='Abono'?'green':r.category==='Gasto'?'red':r.category==='Nomina'?'orange':r.category==='Renta'?'amber':'blue'}">${r.category}</span></td>
+              <td>${r.account||''}</td>
+              <td>${r.description||''}</td>
+              <td class="right mono green-text">${r.abono>0?fmt(r.abono):''}</td>
+              <td class="right mono red-text">${r.gasto>0?fmt(r.gasto):''}</td>
+              <td class="right mono bold">${fmt(r.saldo)}</td>
+            </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>`;
+}
+
+function renderCajaFuerte() {
+  return `
+    <div class="kpis">
+      <div class="kpi purple"><div class="val">${fmt(state.cajaFuerte.balance)}</div><div class="lbl">${t('safe_balance')}</div></div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-hdr"><h3>${t('safe_transaction')}</h3></div>
+      <form onsubmit="event.preventDefault();saveCajaFuerte(this)" class="form-row">
+        <div class="form-group"><label>${t('date')}</label><input type="date" name="tx_date" value="${state.date}" required></div>
+        <div class="form-group" style="flex:2"><label>${t('description')}</label><input type="text" name="description" placeholder="ej. Caja" required></div>
+        <div class="form-group"><label>${t('deposit')}</label><input type="number" name="deposit" step="1" placeholder="0"></div>
+        <div class="form-group"><label>${t('withdrawal')}</label><input type="number" name="debit" step="1" placeholder="0"></div>
+        <div class="form-group" style="flex:0"><button type="submit" class="btn btn-green">${t('save')}</button></div>
+      </form>
+    </div>
+
+    <div class="panel">
+      <div class="panel-hdr"><h3>${t('safe_ledger')}</h3></div>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>${t('date')}</th><th>${t('description')}</th><th class="right">${t('deposit')}</th><th class="right">${t('withdrawal')}</th><th class="right">${t('balance')}</th></tr></thead>
+          <tbody>${(state.cajaFuerte.rows||[]).map(r => `
+            <tr>
+              <td class="mono">${r.tx_date?.slice(0,10)||''}</td>
+              <td>${r.description||''}</td>
+              <td class="right mono green-text">${r.deposit>0?fmt(r.deposit):''}</td>
+              <td class="right mono red-text">${r.debit>0?fmt(r.debit):''}</td>
+              <td class="right mono bold">${fmt(r.saldo)}</td>
+            </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>`;
+}
+
+function renderNomina() {
+  const byStore = {};
+  state.nomina.forEach(r => {
+    const k = r.store || 'Other';
+    if (!byStore[k]) byStore[k] = [];
+    byStore[k].push(r);
+  });
+
+  return `
+    <div class="panel">
+      <div class="panel-hdr"><h3>${t('record_payroll')}</h3></div>
+      <form onsubmit="event.preventDefault();saveNomina(this)" class="form-row">
+        <div class="form-group"><label>${t('pay_date')}</label><input type="date" name="pay_date" value="${state.date}" required></div>
+        <div class="form-group"><label>${t('employee')}</label><input type="text" name="employee_name" placeholder="ej. YOANA" required></div>
+        <div class="form-group"><label>${t('store')}</label>
+          <select name="store"><option value="Circunvalacion">Circunvalacion</option><option value="Leona Vicario">Leona Vicario</option><option value="Oyamil">Oyamil</option><option value="Solares">Solares</option></select>
+        </div>
+        <div class="form-group"><label>${t('amount')}</label><input type="number" name="amount" step="1" placeholder="0" required></div>
+        <div class="form-group"><label>${t('notes')}</label><input type="text" name="notes" placeholder="${t('optional')}"></div>
+        <div class="form-group" style="flex:0"><button type="submit" class="btn btn-green">${t('save')}</button></div>
+      </form>
+    </div>
+
+    <div class="panel">
+      <div class="panel-hdr"><h3>${t('payroll_history')}</h3></div>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>${t('date')}</th><th>${t('employee')}</th><th>${t('store')}</th><th class="right">${t('amount')}</th><th>${t('notes')}</th></tr></thead>
+          <tbody>${state.nomina.map(r => `
+            <tr>
+              <td class="mono">${r.pay_date?.slice(0,10)||''}</td>
+              <td class="bold">${r.employee_name}</td>
+              <td>${storeTag(r.store||'')}</td>
+              <td class="right mono bold">${fmt(r.amount)}</td>
+              <td class="mono" style="color:var(--muted)">${r.notes||''}</td>
+            </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>`;
+}
+
+function renderPrestamos() {
+  return `
+    <div class="kpis">
+      <div class="kpi orange"><div class="val">${fmt(state.prestamos.balance)}</div><div class="lbl">${t('jj_balance')}</div></div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-hdr"><h3>${t('record_tx')}</h3></div>
+      <form onsubmit="event.preventDefault();savePrestamo(this)" class="form-row">
+        <div class="form-group"><label>${t('date')}</label><input type="date" name="tx_date" value="${state.date}" required></div>
+        <div class="form-group" style="flex:2"><label>${t('description')}</label><input type="text" name="description" placeholder="ej. caja fuerte" required></div>
+        <div class="form-group"><label>${t('income')}</label><input type="number" name="abono" step="1" placeholder="0"></div>
+        <div class="form-group"><label>${t('withdrawal')}</label><input type="number" name="gasto" step="1" placeholder="0"></div>
+        <div class="form-group" style="flex:0"><button type="submit" class="btn btn-green">${t('save')}</button></div>
+      </form>
+    </div>
+
+    <div class="panel">
+      <div class="panel-hdr"><h3>${t('loan_ledger')}</h3></div>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>${t('date')}</th><th>${t('description')}</th><th class="right">${t('income')}</th><th class="right">${t('withdrawal')}</th><th class="right">${t('balance')}</th></tr></thead>
+          <tbody>${(state.prestamos.rows||[]).map(r => `
+            <tr>
+              <td class="mono">${r.tx_date?.slice(0,10)||''}</td>
+              <td>${r.description||''}</td>
+              <td class="right mono green-text">${r.abono>0?fmt(r.abono):''}</td>
+              <td class="right mono red-text">${r.gasto>0?fmt(r.gasto):''}</td>
+              <td class="right mono bold">${fmt(r.saldo)}</td>
+            </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>`;
+}
+
+function renderValle() {
+  return `
+    <div class="kpis">
+      <div class="kpi blue"><div class="val">${fmt(state.valle.balance)}</div><div class="lbl">${t('valle_balance')}</div></div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-hdr"><h3>${t('record_tx')}</h3></div>
+      <form onsubmit="event.preventDefault();saveValle(this)" class="form-row">
+        <div class="form-group"><label>${t('date')}</label><input type="date" name="tx_date" value="${state.date}" required></div>
+        <div class="form-group" style="flex:2"><label>${t('description')}</label><input type="text" name="description" placeholder="ej. RENTA DE CIRCUMVALACION" required></div>
+        <div class="form-group"><label>${t('income')}</label><input type="number" name="abono" step="1" placeholder="0"></div>
+        <div class="form-group"><label>${t('expense')}</label><input type="number" name="gasto" step="1" placeholder="0"></div>
+        <div class="form-group" style="flex:0"><button type="submit" class="btn btn-green">${t('save')}</button></div>
+      </form>
+    </div>
+
+    <div class="panel">
+      <div class="panel-hdr"><h3>${t('valle_ledger')}</h3></div>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>${t('date')}</th><th>${t('description')}</th><th class="right">${t('income')}</th><th class="right">${t('expense')}</th><th class="right">${t('balance')}</th></tr></thead>
+          <tbody>${(state.valle.rows||[]).map(r => `
+            <tr>
+              <td class="mono">${r.tx_date?.slice(0,10)||''}</td>
+              <td>${r.description||''}</td>
+              <td class="right mono green-text">${r.abono>0?fmt(r.abono):''}</td>
+              <td class="right mono red-text">${r.gasto>0?fmt(r.gasto):''}</td>
+              <td class="right mono bold">${fmt(r.saldo)}</td>
+            </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>`;
+}
+
+const TABS = [
+  { id: 'overview', key: 'overview' },
+  { id: 'daily_sales', key: 'daily_sales' },
+  { id: 'caja', key: 'caja' },
+  { id: 'caja_fuerte', key: 'safe' },
+  { id: 'nomina', key: 'payroll' },
+  { id: 'prestamos', key: 'loans' },
+  { id: 'valle', key: 'valle' },
+];
+
+function render() {
+  const content = state.loading ? '<div class="loading">Loading...</div>' :
+    state.tab === 'overview' ? renderOverview() :
+    state.tab === 'daily_sales' ? renderDailySales() :
+    state.tab === 'caja' ? renderCaja() :
+    state.tab === 'caja_fuerte' ? renderCajaFuerte() :
+    state.tab === 'nomina' ? renderNomina() :
+    state.tab === 'prestamos' ? renderPrestamos() :
+    state.tab === 'valle' ? renderValle() : '';
+
+  document.getElementById('app').innerHTML = `
+    <div class="hdr">
+      <h1>Melagros <span>Centro</span></h1>
+      <div class="date-nav">
+        <button class="btn btn-sm" onclick="setDate(new Date(new Date('${state.date}').getTime()-86400000).toISOString().slice(0,10))">&#9664;</button>
+        <input type="date" value="${state.date}" onchange="setDate(this.value)">
+        <button class="btn btn-sm" onclick="setDate(new Date(new Date('${state.date}').getTime()+86400000).toISOString().slice(0,10))">&#9654;</button>
+        <button class="btn btn-sm btn-blue" onclick="setDate(today())">${t('today_btn')}</button>
+      </div>
+      <div style="display:flex;gap:0;background:var(--card);border-radius:8px;padding:2px;border:1px solid var(--border);margin-left:8px">
+        <button onclick="setLang('es')" style="padding:4px 10px;border:none;background:${lang==='es'?'var(--blue)':'transparent'};color:${lang==='es'?'#fff':'var(--muted)'};font-size:11px;font-weight:700;cursor:pointer;border-radius:6px">ES</button>
+        <button onclick="setLang('en')" style="padding:4px 10px;border:none;background:${lang==='en'?'var(--blue)':'transparent'};color:${lang==='en'?'#fff':'var(--muted)'};font-size:11px;font-weight:700;cursor:pointer;border-radius:6px">EN</button>
+      </div>
+    </div>
+    <div class="tabs">
+      ${TABS.map(tb => `<button class="tab ${state.tab===tb.id?'active':''}" onclick="setTab('${tb.id}')">${t(tb.key)}</button>`).join('')}
+    </div>
+    ${content}
+  `;
+}
+
+render();
+loadData('overview');
+</script>
+</body>
+</html>

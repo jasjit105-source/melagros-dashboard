@@ -1,0 +1,8 @@
+{
+  "name": "melagros-dashboard",
+  "version": "1.0.0",
+  "description": "Melagros Centro Dashboard — Store sales, cashbox & expense tracking",
+  "dependencies": {
+    "@neondatabase/serverless": "^0.9.0"
+  }
+}
