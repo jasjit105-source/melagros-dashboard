@@ -165,10 +165,10 @@ exports.handler = async (event) => {
 
       // Helper: upsert a caja entry for this date+account (so re-sync doesn't duplicate)
       async function upsertCaja(category, account, description, gasto) {
-        // Check if entry already exists for this date + account + description
+        // Check if entry already exists for this date + account (case-insensitive)
         const existing = await sql`
           SELECT id FROM caja
-          WHERE tx_date = ${fecha} AND account = ${account} AND description = ${description}
+          WHERE tx_date = ${fecha} AND LOWER(account) = LOWER(${account}) AND LOWER(description) = LOWER(${description})
           LIMIT 1`;
 
         if (existing.length > 0) {
@@ -191,7 +191,7 @@ exports.handler = async (event) => {
       if (totalDeposit > 0) {
         const existingAbono = await sql`
           SELECT id FROM caja
-          WHERE tx_date = ${fecha} AND account = 'Tienda Centro' AND description = 'abono tienda'
+          WHERE tx_date = ${fecha} AND LOWER(account) = 'tienda centro' AND LOWER(description) = 'abono tienda'
           LIMIT 1`;
         if (existingAbono.length > 0) {
           await sql`UPDATE caja SET abono = ${totalDeposit}, updated_at = NOW() WHERE id = ${existingAbono[0].id}`;
