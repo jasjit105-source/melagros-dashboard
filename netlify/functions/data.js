@@ -18,8 +18,16 @@ exports.handler = async (event) => {
     if (table === "caja") {
       const from = params.from || "2026-01-01";
       const to = params.to || "2099-12-31";
-      const rows = await sql`SELECT * FROM caja WHERE tx_date >= ${from} AND tx_date <= ${to} ORDER BY id DESC LIMIT ${limit} OFFSET ${offset}`;
-      const bal = await sql`SELECT saldo FROM caja ORDER BY id DESC LIMIT 1`;
+      // Calculate running balance dynamically so it's always correct
+      const rows = await sql`
+        WITH running AS (
+          SELECT id, tx_date, category, account, description, abono, gasto, created_at,
+            SUM(COALESCE(abono,0) - COALESCE(gasto,0)) OVER (ORDER BY id) as saldo
+          FROM caja
+        )
+        SELECT * FROM running WHERE tx_date >= ${from} AND tx_date <= ${to}
+        ORDER BY id DESC LIMIT ${limit} OFFSET ${offset}`;
+      const bal = await sql`SELECT SUM(COALESCE(abono,0) - COALESCE(gasto,0)) as saldo FROM caja`;
       return ok({ rows, balance: bal[0]?.saldo || 0 });
     }
     if (table === "caja_fuerte") {
