@@ -143,13 +143,26 @@ exports.handler = async (event) => {
     if (results.length > 0) {
       const cajaEntries = [];
 
-      // 1. Total deposit from all stores → Abono / Tienda Centro / "abono tienda"
-      const totalDeposit = results.reduce((a, r) => {
+      // 1. Save Tarjeta and Transferencia to their own tables
+      for (const r of results) {
         const p = r.parsed;
-        return a + p.retiro + p.depositos_bancarios;
-      }, 0);
+        if (p.tarjeta > 0) {
+          await sql`INSERT INTO tarjeta_diaria (tx_date, store, amount) VALUES (${fecha}, ${r.store}, ${p.tarjeta})
+            ON CONFLICT (tx_date, store) DO UPDATE SET amount = EXCLUDED.amount`;
+        }
+        if (p.transfer > 0) {
+          await sql`INSERT INTO transferencia_diaria (tx_date, store, amount) VALUES (${fecha}, ${r.store}, ${p.transfer})
+            ON CONFLICT (tx_date, store) DO UPDATE SET amount = EXCLUDED.amount`;
+        }
+      }
 
-      // 2. Total ventas across all stores (for Seva 5% calc)
+      // 2. Caja "abono tienda" = Sum of Abono1+2+3 from all stores (CASH ONLY)
+      // Abonos are entered manually by the girl in Step 2, so at Corte sync time
+      // we read whatever Abonos are already in daily_sales for this date
+      const allSales = await sql`SELECT abono1, abono2, abono3 FROM daily_sales WHERE sale_date = ${fecha}`;
+      const totalCashDeposit = allSales.reduce((a, r) => a + (Number(r.abono1)||0) + (Number(r.abono2)||0) + (Number(r.abono3)||0), 0);
+
+      // 3. Total ventas across all stores (for Seva 5% calc)
       const totalVentas = results.reduce((a, r) => a + r.parsed.venta, 0);
 
       // 3. Seva = 5% of total ventas, rounded to nearest 100
@@ -187,22 +200,20 @@ exports.handler = async (event) => {
         }
       }
 
-      // Post "abono tienda" — income from stores
-      if (totalDeposit > 0) {
-        const existingAbono = await sql`
-          SELECT id FROM caja
-          WHERE tx_date = ${fecha} AND LOWER(account) = 'tienda centro' AND LOWER(description) = 'abono tienda'
-          LIMIT 1`;
-        if (existingAbono.length > 0) {
-          await sql`UPDATE caja SET abono = ${totalDeposit}, updated_at = NOW() WHERE id = ${existingAbono[0].id}`;
-          cajaEntries.push({ type: 'abono tienda', amount: totalDeposit, action: 'updated' });
-        } else {
-          saldo = saldo + totalDeposit;
-          await sql`
-            INSERT INTO caja (tx_date, category, account, description, abono, gasto, saldo)
-            VALUES (${fecha}, 'Abono', 'Tienda Centro', 'abono tienda', ${totalDeposit}, 0, ${saldo})`;
-          cajaEntries.push({ type: 'abono tienda', amount: totalDeposit, action: 'inserted' });
-        }
+      // Post "abono tienda" — CASH ONLY (sum of Abono1+2+3 from all stores)
+      const existingAbono = await sql`
+        SELECT id FROM caja
+        WHERE tx_date = ${fecha} AND LOWER(account) = 'tienda centro' AND LOWER(description) = 'abono tienda'
+        LIMIT 1`;
+      if (existingAbono.length > 0) {
+        await sql`UPDATE caja SET abono = ${totalCashDeposit}, updated_at = NOW() WHERE id = ${existingAbono[0].id}`;
+        cajaEntries.push({ type: 'abono tienda (cash)', amount: totalCashDeposit, action: 'updated' });
+      } else {
+        saldo = saldo + totalCashDeposit;
+        await sql`
+          INSERT INTO caja (tx_date, category, account, description, abono, gasto, saldo)
+          VALUES (${fecha}, 'Abono', 'Tienda Centro', 'abono tienda', ${totalCashDeposit}, 0, ${saldo})`;
+        cajaEntries.push({ type: 'abono tienda (cash)', amount: totalCashDeposit, action: 'inserted' });
       }
 
       // Post Proyecto Valle / Renta Circunvalacion — 15,000 daily
@@ -217,7 +228,9 @@ exports.handler = async (event) => {
       const sevaResult = await upsertCaja('Abono', 'Seva', 'Seva Dasvant', sevaAmount);
       cajaEntries.push({ type: 'Seva', amount: sevaAmount, pct: '5%', totalVentas, ...sevaResult });
 
-      return ok({ fecha, synced: results.length, results, cajaEntries, totalVentas, totalDeposit, sevaAmount });
+      const totalTarjeta = results.reduce((a, r) => a + r.parsed.tarjeta, 0);
+      const totalTransfer = results.reduce((a, r) => a + r.parsed.transfer, 0);
+      return ok({ fecha, synced: results.length, results, cajaEntries, totalVentas, totalCashDeposit, totalTarjeta, totalTransfer, sevaAmount });
     }
 
     return ok({ fecha, synced: results.length, results });

@@ -54,6 +54,20 @@ exports.handler = async (event) => {
       const rows = await sql`SELECT * FROM employees WHERE active = true ORDER BY store, name`;
       return ok(rows);
     }
+    if (table === "tarjeta") {
+      const from = params.from || "2020-01-01";
+      const to = params.to || "2099-12-31";
+      const rows = await sql`SELECT * FROM tarjeta_diaria WHERE tx_date >= ${from} AND tx_date <= ${to} ORDER BY tx_date DESC, store LIMIT ${limit}`;
+      const totals = await sql`SELECT SUM(amount) as total FROM tarjeta_diaria WHERE tx_date >= ${from} AND tx_date <= ${to}`;
+      return ok({ rows, total: totals[0]?.total || 0 });
+    }
+    if (table === "transferencia") {
+      const from = params.from || "2020-01-01";
+      const to = params.to || "2099-12-31";
+      const rows = await sql`SELECT * FROM transferencia_diaria WHERE tx_date >= ${from} AND tx_date <= ${to} ORDER BY tx_date DESC, store LIMIT ${limit}`;
+      const totals = await sql`SELECT SUM(amount) as total FROM transferencia_diaria WHERE tx_date >= ${from} AND tx_date <= ${to}`;
+      return ok({ rows, total: totals[0]?.total || 0 });
+    }
     if (table === "summary") {
       const today = params.date || new Date().toISOString().slice(0, 10);
       const sales = await sql`SELECT store, venta, total_venta, deposito, gastos FROM daily_sales WHERE sale_date = ${today}`;

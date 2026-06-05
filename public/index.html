@@ -103,6 +103,10 @@ const i18n = {
     valle_balance:'Saldo Proyecto Valle', valle_ledger:'Libro Valle Control',
     today_btn:'Hoy', optional:'opcional',
     autofill:'Auto-llenar del Corte',
+    tarjeta_tab:'Tarjeta', transfer_tab:'Transferencia',
+    tarjeta_title:'Pagos con Tarjeta', transfer_title:'Transferencias Bancarias',
+    tarjeta_total:'Total Tarjeta', transfer_total:'Total Transferencias',
+    card_ledger:'Registro de Tarjeta', transfer_ledger:'Registro de Transferencias',
   },
   en: {
     overview:'Overview', daily_sales:'Daily Sales', caja:'Caja', safe:'Safe',
@@ -134,6 +138,10 @@ const i18n = {
     valle_balance:'Valle Project Balance', valle_ledger:'Valle Control Ledger',
     today_btn:'Today', optional:'optional',
     autofill:'Auto-fill from Corte',
+    tarjeta_tab:'Card', transfer_tab:'Transfer',
+    tarjeta_title:'Card Payments', transfer_title:'Bank Transfers',
+    tarjeta_total:'Total Card', transfer_total:'Total Transfers',
+    card_ledger:'Card Payment Log', transfer_ledger:'Transfer Log',
   }
 };
 
@@ -150,6 +158,8 @@ let state = {
   nomina: [],
   prestamos: { rows: [], balance: 0 },
   valle: { rows: [], balance: 0 },
+  tarjeta: { rows: [], total: 0 },
+  transferencia: { rows: [], total: 0 },
   categories: [],
   subAccounts: [],
   loading: false,
@@ -183,6 +193,8 @@ async function loadData(tab) {
     if (tab === 'nomina') state.nomina = await api('data', { table: 'nomina' });
     if (tab === 'prestamos') state.prestamos = await api('data', { table: 'prestamos' });
     if (tab === 'valle') state.valle = await api('data', { table: 'valle_control' });
+    if (tab === 'tarjeta') state.tarjeta = await api('data', { table: 'tarjeta', from: weekAgo, to: d, limit: 200 });
+    if (tab === 'transferencia') state.transferencia = await api('data', { table: 'transferencia', from: weekAgo, to: d, limit: 200 });
     if (tab === 'caja') state.categories = await api('data', { table: 'categories' });
   } catch (e) { console.error('Load error:', e); }
   state.loading = false; render();
@@ -510,6 +522,18 @@ function renderCaja() {
     </div>`;
 }
 
+function renderTarjeta() {
+  const rows = state.tarjeta.rows || [];
+  const total = Number(state.tarjeta.total) || 0;
+  return '<div class="kpis"><div class="kpi blue"><div class="val">'+fmt(total)+'</div><div class="lbl">'+t('tarjeta_total')+'</div></div></div><div class="panel"><div class="panel-hdr"><h3>'+t('card_ledger')+'</h3></div><div class="tbl-wrap"><table><thead><tr><th>'+t('date')+'</th><th>'+t('store')+'</th><th class="right">'+t('amount')+'</th></tr></thead><tbody>'+rows.map(r => '<tr><td class="mono bold">'+(r.tx_date?.slice(0,10)||'')+'</td><td>'+storeTag(r.store)+'</td><td class="right mono bold blue-text">'+fmt(r.amount)+'</td></tr>').join('')+'</tbody></table></div></div>';
+}
+
+function renderTransferencia() {
+  const rows = state.transferencia.rows || [];
+  const total = Number(state.transferencia.total) || 0;
+  return '<div class="kpis"><div class="kpi purple"><div class="val">'+fmt(total)+'</div><div class="lbl">'+t('transfer_total')+'</div></div></div><div class="panel"><div class="panel-hdr"><h3>'+t('transfer_ledger')+'</h3></div><div class="tbl-wrap"><table><thead><tr><th>'+t('date')+'</th><th>'+t('store')+'</th><th class="right">'+t('amount')+'</th></tr></thead><tbody>'+rows.map(r => '<tr><td class="mono bold">'+(r.tx_date?.slice(0,10)||'')+'</td><td>'+storeTag(r.store)+'</td><td class="right mono bold purple-text">'+fmt(r.amount)+'</td></tr>').join('')+'</tbody></table></div></div>';
+}
+
 function renderCajaFuerte() {
   return `
     <div class="kpis">
@@ -664,6 +688,8 @@ const TABS = [
   { id: 'overview', key: 'overview' },
   { id: 'daily_sales', key: 'daily_sales' },
   { id: 'caja', key: 'caja' },
+  { id: 'tarjeta', key: 'tarjeta_tab' },
+  { id: 'transferencia', key: 'transfer_tab' },
   { id: 'caja_fuerte', key: 'safe' },
   { id: 'nomina', key: 'payroll' },
   { id: 'prestamos', key: 'loans' },
@@ -675,6 +701,8 @@ function render() {
     state.tab === 'overview' ? renderOverview() :
     state.tab === 'daily_sales' ? renderDailySales() :
     state.tab === 'caja' ? renderCaja() :
+    state.tab === 'tarjeta' ? renderTarjeta() :
+    state.tab === 'transferencia' ? renderTransferencia() :
     state.tab === 'caja_fuerte' ? renderCajaFuerte() :
     state.tab === 'nomina' ? renderNomina() :
     state.tab === 'prestamos' ? renderPrestamos() :

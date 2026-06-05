@@ -40,6 +40,18 @@ exports.handler = async (event) => {
           cb_next = EXCLUDED.cb_next, deposito = EXCLUDED.deposito,
           updated_at = NOW()
         RETURNING *`;
+
+      // Auto-update Caja "abono tienda" with total cash (Abono1+2+3) from ALL stores
+      const allSales = await sql`SELECT abono1, abono2, abono3 FROM daily_sales WHERE sale_date = ${sale_date}`;
+      const totalCash = allSales.reduce((sum, s) => sum + (Number(s.abono1)||0) + (Number(s.abono2)||0) + (Number(s.abono3)||0), 0);
+      const existingCaja = await sql`SELECT id FROM caja WHERE tx_date = ${sale_date} AND LOWER(account) = 'tienda centro' AND LOWER(description) = 'abono tienda' LIMIT 1`;
+      if (existingCaja.length > 0) {
+        await sql`UPDATE caja SET abono = ${totalCash}, updated_at = NOW() WHERE id = ${existingCaja[0].id}`;
+      } else if (totalCash > 0) {
+        const lb = await sql`SELECT saldo FROM caja ORDER BY id DESC LIMIT 1`;
+        await sql`INSERT INTO caja (tx_date, category, account, description, abono, gasto, saldo) VALUES (${sale_date}, 'Abono', 'Tienda Centro', 'abono tienda', ${totalCash}, 0, ${(Number(lb[0]?.saldo)||0) + totalCash})`;
+      }
+
       return ok(rows[0]);
     }
 
