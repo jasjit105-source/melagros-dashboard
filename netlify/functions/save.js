@@ -10,13 +10,28 @@ exports.handler = async (event) => {
     const action = body.action;
 
     if (action === "save_daily_sales") {
-      const { sale_date, store, cb, venta, otro_venta, gastos, abono1, abono2, abono3, tarjeta, mayoreo } = body;
-      const total_venta = (Number(cb) || 0) + (Number(venta) || 0) + (Number(otro_venta) || 0);
-      const deposito = (Number(abono1) || 0) + (Number(abono2) || 0) + (Number(abono3) || 0);
-      const cb_next = total_venta - (Number(gastos) || 0) - deposito - (Number(tarjeta) || 0) - (Number(mayoreo) || 0);
+      const { sale_date, store, abono1, abono2, abono3, otro_venta, gastos } = body;
+      // Only update the fields the girl fills in manually (Abonos, Gastos, Otro)
+      // Preserve Corte-filled fields (cb, venta, total_venta, tarjeta, mayoreo, cb_next)
+      const existing = await sql`SELECT * FROM daily_sales WHERE sale_date = ${sale_date} AND store = ${store} LIMIT 1`;
+      const prev = existing[0] || {};
+
+      const cb = Number(body.cb) || Number(prev.cb) || 0;
+      const venta = Number(body.venta) || Number(prev.venta) || 0;
+      const otro = Number(otro_venta) || 0;
+      const total_venta = cb + venta + otro;
+      const g = Number(gastos) || Number(prev.gastos) || 0;
+      const a1 = Number(abono1) || 0;
+      const a2 = Number(abono2) || 0;
+      const a3 = Number(abono3) || 0;
+      const tarjeta = Number(body.tarjeta) || Number(prev.tarjeta) || 0;
+      const mayoreo = Number(body.mayoreo) || Number(prev.mayoreo) || 0;
+      const deposito = a1 + a2 + a3;
+      const cb_next = Number(prev.cb_next) || (total_venta - g - deposito - tarjeta - mayoreo);
+
       const rows = await sql`
         INSERT INTO daily_sales (sale_date, store, cb, venta, otro_venta, total_venta, gastos, abono1, abono2, abono3, tarjeta, mayoreo, cb_next, deposito, source)
-        VALUES (${sale_date}, ${store}, ${cb||0}, ${venta||0}, ${otro_venta||0}, ${total_venta}, ${gastos||0}, ${abono1||0}, ${abono2||0}, ${abono3||0}, ${tarjeta||0}, ${mayoreo||0}, ${cb_next}, ${deposito}, 'manual')
+        VALUES (${sale_date}, ${store}, ${cb}, ${venta}, ${otro}, ${total_venta}, ${g}, ${a1}, ${a2}, ${a3}, ${tarjeta}, ${mayoreo}, ${cb_next}, ${deposito}, ${prev.source || 'manual'})
         ON CONFLICT (sale_date, store) DO UPDATE SET
           cb = EXCLUDED.cb, venta = EXCLUDED.venta, otro_venta = EXCLUDED.otro_venta,
           total_venta = EXCLUDED.total_venta, gastos = EXCLUDED.gastos,

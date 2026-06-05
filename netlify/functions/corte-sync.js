@@ -125,6 +125,11 @@ exports.handler = async (event) => {
           mayoreo = EXCLUDED.mayoreo,
           cb_next = EXCLUDED.cb_next,
           deposito = EXCLUDED.deposito,
+          -- Preserve manually-entered Abonos — Corte never touches these
+          abono1 = daily_sales.abono1,
+          abono2 = daily_sales.abono2,
+          abono3 = daily_sales.abono3,
+          otro_venta = daily_sales.otro_venta,
           corte_raw = EXCLUDED.corte_raw,
           source = 'corte',
           updated_at = NOW()
