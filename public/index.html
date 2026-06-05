@@ -501,25 +501,12 @@ function renderCaja() {
       <div class="tbl-wrap">
         <table>
           <thead><tr><th>${t('date')}</th><th>${t('category')}</th><th>${t('account')}</th><th>${t('description')}</th><th class="right">${t('income')}</th><th class="right">${t('expense')}</th><th class="right">${t('balance')}</th><th></th></tr></thead>
-          <tbody>${(state.caja.rows||[]).map(r => {
-            const isEditing = editingCajaId == r.id;
-            return `<tr${isEditing?' style="background:#eff4ff"':''}>
+          <tbody>${(state.caja.rows||[]).map(r => `<tr${editingCajaId==r.id?' style="background:#eff4ff"':''}>
               <td class="mono">${r.tx_date?.slice(0,10)||''}</td>
               <td><span class="badge badge-${r.category==='Abono'?'green':r.category==='Gasto'?'red':r.category==='Nomina'?'orange':r.category==='Renta'?'amber':'blue'}">${r.category}</span></td>
               <td>${r.account||''}</td>
               <td>${r.description||''}</td>
-              ${isEditing ? `
-              <td class="right"><input id="edit-abono-${r.id}" type="number" value="${Number(r.abono)||0}" step="1" style="width:90px;padding:4px 6px;border:2px solid var(--green);border-radius:6px;font-family:monospace;font-size:12px;text-align:right"></td>
-              <td class="right"><input id="edit-gasto-${r.id}" type="number" value="${Number(r.gasto)||0}" step="1" style="width:90px;padding:4px 6px;border:2px solid var(--red);border-radius:6px;font-family:monospace;font-size:12px;text-align:right"></td>
-              <td class="right mono bold">${fmt(r.saldo)}</td>
-              <td style="white-space:nowrap">
-                <button class="btn btn-green btn-sm" onclick="saveEditCaja(${r.id})">&#10003;</button>
-                <button class="btn btn-sm" onclick="cancelEditCaja()">&#10005;</button>
-              </td>` : `
-              <td class="right mono green-text">${r.abono>0?fmt(r.abono):''}</td>
-              <td class="right mono red-text">${r.gasto>0?fmt(r.gasto):''}</td>
-              <td class="right mono bold">${fmt(r.saldo)}</td>
-              <td><button class="btn btn-sm" onclick="startEditCaja(${r.id})" style="font-size:10px;padding:2px 8px">&#9998;</button></td>`}
+              ${editingCajaId==r.id ? '<td class="right"><input id="edit-abono-'+r.id+'" type="number" value="'+(Number(r.abono)||0)+'" step="1" style="width:90px;padding:4px 6px;border:2px solid var(--green);border-radius:6px;font-family:monospace;font-size:12px;text-align:right"></td><td class="right"><input id="edit-gasto-'+r.id+'" type="number" value="'+(Number(r.gasto)||0)+'" step="1" style="width:90px;padding:4px 6px;border:2px solid var(--red);border-radius:6px;font-family:monospace;font-size:12px;text-align:right"></td><td class="right mono bold">'+fmt(r.saldo)+'</td><td style="white-space:nowrap"><button class="btn btn-green btn-sm" onclick="saveEditCaja('+r.id+')">&#10003;</button> <button class="btn btn-sm" onclick="cancelEditCaja()">&#10005;</button></td>' : '<td class="right mono green-text">'+(r.abono>0?fmt(r.abono):'')+'</td><td class="right mono red-text">'+(r.gasto>0?fmt(r.gasto):'')+'</td><td class="right mono bold">'+fmt(r.saldo)+'</td><td><button class="btn btn-sm" onclick="startEditCaja('+r.id+')" style="font-size:10px;padding:2px 8px">&#9998;</button></td>'}
             </tr>`).join('')}
           </tbody>
         </table>
