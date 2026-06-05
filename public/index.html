@@ -212,10 +212,9 @@ async function saveCaja(form) {
 }
 
 let editingCajaId = null;
-function startEditCaja(id, abono, gasto, desc) {
+function startEditCaja(id) {
   editingCajaId = id;
   render();
-  // Focus the first input after render
   setTimeout(() => { const el = document.getElementById('edit-abono-'+id); if(el) el.focus(); }, 50);
 }
 function cancelEditCaja() { editingCajaId = null; render(); }
@@ -520,7 +519,7 @@ function renderCaja() {
               <td class="right mono green-text">${r.abono>0?fmt(r.abono):''}</td>
               <td class="right mono red-text">${r.gasto>0?fmt(r.gasto):''}</td>
               <td class="right mono bold">${fmt(r.saldo)}</td>
-              <td><button class="btn btn-sm" onclick="startEditCaja(${r.id},${Number(r.abono)||0},${Number(r.gasto)||0},'${(r.description||'').replace(/'/g,"\\'")}')" style="font-size:10px;padding:2px 8px">&#9998;</button></td>`}
+              <td><button class="btn btn-sm" onclick="startEditCaja(${r.id})" style="font-size:10px;padding:2px 8px">&#9998;</button></td>`}
             </tr>`).join('')}
           </tbody>
         </table>
