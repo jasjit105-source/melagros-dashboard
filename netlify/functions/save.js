@@ -55,6 +55,20 @@ exports.handler = async (event) => {
       return ok(rows[0]);
     }
 
+    if (action === "update_caja") {
+      const { id, abono, gasto, description } = body;
+      const rows = await sql`
+        UPDATE caja SET
+          abono = ${Number(abono)||0},
+          gasto = ${Number(gasto)||0},
+          description = COALESCE(${description}, description),
+          updated_at = NOW()
+        WHERE id = ${id}
+        RETURNING *`;
+      if (!rows.length) return err("Row not found", 404);
+      return ok(rows[0]);
+    }
+
     if (action === "save_caja_fuerte") {
       const { tx_date, description, deposit, debit } = body;
       const lastBal = await sql`SELECT saldo FROM caja_fuerte ORDER BY id DESC LIMIT 1`;
