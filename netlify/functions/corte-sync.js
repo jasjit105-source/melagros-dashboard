@@ -138,6 +138,88 @@ exports.handler = async (event) => {
       results.push({ store, parsed: p, saved: rows[0] });
     }
 
+    // === AUTO-POST CAJA ENTRIES ===
+    // Only if we actually synced stores
+    if (results.length > 0) {
+      const cajaEntries = [];
+
+      // 1. Total deposit from all stores → Abono / Tienda Centro / "abono tienda"
+      const totalDeposit = results.reduce((a, r) => {
+        const p = r.parsed;
+        return a + p.retiro + p.depositos_bancarios;
+      }, 0);
+
+      // 2. Total ventas across all stores (for Seva 5% calc)
+      const totalVentas = results.reduce((a, r) => a + r.parsed.venta, 0);
+
+      // 3. Seva = 5% of total ventas, rounded to nearest 100
+      const sevaAmount = Math.round((totalVentas * 0.05) / 100) * 100;
+
+      // Fixed daily amounts (editable — girl can change in Caja tab later)
+      const VALLE_DAILY = 15000;
+      const JJ_DAILY = 10000;
+
+      // Get current caja balance
+      const lastBal = await sql`SELECT saldo FROM caja ORDER BY id DESC LIMIT 1`;
+      let saldo = Number(lastBal[0]?.saldo) || 0;
+
+      // Helper: upsert a caja entry for this date+account (so re-sync doesn't duplicate)
+      async function upsertCaja(category, account, description, gasto) {
+        // Check if entry already exists for this date + account + description
+        const existing = await sql`
+          SELECT id FROM caja
+          WHERE tx_date = ${fecha} AND account = ${account} AND description = ${description}
+          LIMIT 1`;
+
+        if (existing.length > 0) {
+          // Update existing — recalculate saldo from scratch after
+          await sql`
+            UPDATE caja SET gasto = ${gasto}, updated_at = NOW()
+            WHERE id = ${existing[0].id}`;
+          return { action: 'updated', id: existing[0].id, gasto };
+        } else {
+          // Insert new
+          saldo = saldo - gasto;
+          await sql`
+            INSERT INTO caja (tx_date, category, account, description, abono, gasto, saldo)
+            VALUES (${fecha}, ${category}, ${account}, ${description}, 0, ${gasto}, ${saldo})`;
+          return { action: 'inserted', gasto, saldo };
+        }
+      }
+
+      // Post "abono tienda" — income from stores
+      if (totalDeposit > 0) {
+        const existingAbono = await sql`
+          SELECT id FROM caja
+          WHERE tx_date = ${fecha} AND account = 'Tienda Centro' AND description = 'abono tienda'
+          LIMIT 1`;
+        if (existingAbono.length > 0) {
+          await sql`UPDATE caja SET abono = ${totalDeposit}, updated_at = NOW() WHERE id = ${existingAbono[0].id}`;
+          cajaEntries.push({ type: 'abono tienda', amount: totalDeposit, action: 'updated' });
+        } else {
+          saldo = saldo + totalDeposit;
+          await sql`
+            INSERT INTO caja (tx_date, category, account, description, abono, gasto, saldo)
+            VALUES (${fecha}, 'Abono', 'Tienda Centro', 'abono tienda', ${totalDeposit}, 0, ${saldo})`;
+          cajaEntries.push({ type: 'abono tienda', amount: totalDeposit, action: 'inserted' });
+        }
+      }
+
+      // Post Proyecto Valle / Renta Circunvalacion — 15,000 daily
+      const valleResult = await upsertCaja('Abono', 'proyecto valle', 'Renta Circunvalacion', VALLE_DAILY);
+      cajaEntries.push({ type: 'proyecto valle', amount: VALLE_DAILY, ...valleResult });
+
+      // Post JJ Ahorro / Jasjit Singh — 10,000 daily
+      const jjResult = await upsertCaja('Abono', 'JJ Ahorro', 'Jasjit Singh', JJ_DAILY);
+      cajaEntries.push({ type: 'JJ Ahorro', amount: JJ_DAILY, ...jjResult });
+
+      // Post Seva / Seva Dasvant — 5% of total ventas rounded to 100
+      const sevaResult = await upsertCaja('Abono', 'Seva', 'Seva Dasvant', sevaAmount);
+      cajaEntries.push({ type: 'Seva', amount: sevaAmount, pct: '5%', totalVentas, ...sevaResult });
+
+      return ok({ fecha, synced: results.length, results, cajaEntries, totalVentas, totalDeposit, sevaAmount });
+    }
+
     return ok({ fecha, synced: results.length, results });
   } catch (e) { return err(e.message); }
 };
