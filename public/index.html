@@ -70,7 +70,7 @@ tbody tr:hover{background:#f8fafd}
 const API = '/api';
 const fmt = n => '$' + (Number(n)||0).toLocaleString('en-US', {minimumFractionDigits: 0, maximumFractionDigits: 0});
 const fmtN = n => (Number(n)||0).toLocaleString('en-US');
-const today = () => new Date().toISOString().slice(0,10);
+const today = () => new Date().toLocaleDateString('en-CA', {timeZone:'America/Mexico_City'});
 
 const i18n = {
   es: {

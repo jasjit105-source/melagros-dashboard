@@ -3,6 +3,11 @@ const { getSQL, ok, err, options } = require("./_db");
 const SQL_PROXY = "https://aggrievedly-spryest-hattie.ngrok-free.dev";
 const SQL_TOKEN = "Sahiba_CZSfEghwaD4s";
 
+// Mexico City time — the girls and the POS are in CDMX
+function getMexicoDate() {
+  return new Date().toLocaleDateString('en-CA', { timeZone: 'America/Mexico_City' });
+}
+
 async function runSQLQuery(query, params = {}) {
   let q = query;
   for (const [k, v] of Object.entries(params)) q = q.replace(`{{${k}}}`, v);
@@ -28,33 +33,50 @@ function parseAmount(text, pattern) {
 function parseCorteReceipt(data) {
   const allText = data.map(r => r.cadenaSalida || '').join('\n');
 
+  // === INGRESOS ===
   const cb = parseAmount(allText, /Inicial en Caja:\s*\$?([\d,]+(?:\.\d+)?)/i);
   const venta = parseAmount(allText, /Ingresos por Ventas:\s*\$?([\d,]+(?:\.\d+)?)/i);
   const totalIngresos = parseAmount(allText, /Total de Ingresos:\s*\$?([\d,]+(?:\.\d+)?)/i);
   const tarjeta = parseAmount(allText, /Total en Tarjetas:\s*\$?([\d,]+(?:\.\d+)?)/i);
   const transfer = parseAmount(allText, /Total en Transfer:\s*\$?([\d,]+(?:\.\d+)?)/i);
   const efectivo = parseAmount(allText, /Total en Efectivo:\s*\$?([\d,]+(?:\.\d+)?)/i);
-  const totalEgresos = parseAmount(allText, /Total de Egresos:\s*\$?([\d,]+(?:\.\d+)?)/i);
   const cobranza = parseAmount(allText, /Ingresos por cobranza:\s*\$?([\d,]+(?:\.\d+)?)/i);
 
-  const totalVentasDB = data.reduce((a, r) => a + (Number(r.totalVentas) || 0), 0);
+  // === EGRESOS — separate gastos from retiros ===
+  const sumaGastos = parseAmount(allText, /Suma de Gastos:\s*\$?([\d,]+(?:\.\d+)?)/i);
+  const sumaRetiro = parseAmount(allText, /Suma de Retiro:\s*\$?([\d,]+(?:\.\d+)?)/i);
+  const totalEgresos = parseAmount(allText, /Total de Egresos:\s*\$?([\d,]+(?:\.\d+)?)/i);
+
+  // === DEPOSITOS BANCARIOS ===
+  const totalDepositos = parseAmount(allText, /Total Depositos:\s*\$?([\d,]+(?:\.\d+)?)/i);
+
+  // === TOTAL EN CAJA (cash left for tomorrow = cb_next) ===
+  const totalEnCaja = parseAmount(allText, /Total en caja:\s*\$?([\d,]+(?:\.\d+)?)/i);
+
+  // === CORTE NUMBER ===
+  const corteNum = data[0]?.numeroCorte || 0;
+
+  // DB fields as fallback
   const totalCajaDB = data.reduce((a, r) => a + (Number(r.totalCaja) || 0), 0);
   const totalIngresosDB = data.reduce((a, r) => a + (Number(r.totalIngresos) || 0), 0);
-  const totalEgresosDB = data.reduce((a, r) => a + (Number(r.totalEgresos) || 0), 0);
 
   return {
-    cb: cb || 0,
-    venta: venta || totalVentasDB,
+    corte_num: corteNum,
+    cb,
+    venta: venta || 0,
     total_venta: totalIngresos || totalIngresosDB,
-    tarjeta: tarjeta,
-    mayoreo: transfer,
-    gastos: totalEgresos || totalEgresosDB,
-    efectivo: efectivo,
-    cobranza: cobranza,
-    totalVentasDB,
-    totalCajaDB,
-    totalIngresosDB,
-    totalEgresosDB,
+    tarjeta,
+    transfer,
+    efectivo,
+    cobranza,
+    // Gastos = only store expenses (parking, shipping, etc), NOT retiros
+    gastos: sumaGastos,
+    retiro: sumaRetiro,
+    total_egresos: totalEgresos,
+    // Depositos bancarios from the receipt
+    depositos_bancarios: totalDepositos,
+    // Cash left in register = tomorrow's CB
+    cb_next: totalEnCaja || totalCajaDB,
     registers: data.length,
   };
 }
@@ -65,7 +87,8 @@ exports.handler = async (event) => {
 
   try {
     const body = event.httpMethod === "POST" ? JSON.parse(event.body) : {};
-    const fecha = body.fecha || new Date().toISOString().slice(0, 10);
+    // Use Mexico City time as default, not UTC
+    const fecha = body.fecha || getMexicoDate();
 
     const [cercuData, leonaData] = await Promise.all([
       runSQLQuery(CORTE_CERCU, { fecha }).catch(() => []),
@@ -77,7 +100,10 @@ exports.handler = async (event) => {
     for (const [store, data] of [["Circunvalacion", cercuData], ["Leona Vicario", leonaData]]) {
       if (!data || !data.length) continue;
 
-      const parsed = parseCorteReceipt(data);
+      const p = parseCorteReceipt(data);
+
+      // deposito = retiro + depositos_bancarios (cash the girl took out of register)
+      const deposito = p.retiro + p.depositos_bancarios;
 
       const rows = await sql`
         INSERT INTO daily_sales (
@@ -85,28 +111,26 @@ exports.handler = async (event) => {
           gastos, tarjeta, mayoreo, cb_next, deposito,
           corte_raw, source
         ) VALUES (
-          ${fecha}, ${store}, ${parsed.cb}, ${parsed.venta}, 0, ${parsed.total_venta},
-          ${parsed.gastos}, ${parsed.tarjeta}, ${parsed.mayoreo}, 0, 0,
-          ${JSON.stringify({ parsed, raw: data.map(r => ({ ...r, cadenaSalida: undefined })) })},
+          ${fecha}, ${store}, ${p.cb}, ${p.venta}, 0, ${p.total_venta},
+          ${p.gastos}, ${p.tarjeta}, ${p.transfer}, ${p.cb_next}, ${deposito},
+          ${JSON.stringify({ parsed: p, raw: data.map(r => ({ ...r, cadenaSalida: undefined })) })},
           'corte'
         )
         ON CONFLICT (sale_date, store) DO UPDATE SET
           cb = EXCLUDED.cb,
           venta = EXCLUDED.venta,
           total_venta = EXCLUDED.total_venta,
-          gastos = CASE WHEN daily_sales.source = 'manual' THEN daily_sales.gastos ELSE EXCLUDED.gastos END,
+          gastos = EXCLUDED.gastos,
           tarjeta = EXCLUDED.tarjeta,
           mayoreo = EXCLUDED.mayoreo,
+          cb_next = EXCLUDED.cb_next,
+          deposito = EXCLUDED.deposito,
           corte_raw = EXCLUDED.corte_raw,
           source = 'corte',
           updated_at = NOW()
         RETURNING *`;
 
-      results.push({
-        store,
-        parsed,
-        saved: rows[0],
-      });
+      results.push({ store, parsed: p, saved: rows[0] });
     }
 
     return ok({ fecha, synced: results.length, results });
