@@ -55,6 +55,29 @@ exports.handler = async (event) => {
       return ok(rows[0]);
     }
 
+    if (action === "update_daily_sales") {
+      const { id } = body;
+      const fields = ['cb','venta','otro_venta','gastos','abono1','abono2','abono3','tarjeta','mayoreo'];
+      const existing = await sql`SELECT * FROM daily_sales WHERE id = ${id}`;
+      if (!existing.length) return err("Row not found", 404);
+      const row = existing[0];
+      const vals = {};
+      fields.forEach(f => { vals[f] = body[f] !== undefined ? Number(body[f])||0 : Number(row[f])||0; });
+      vals.total_venta = vals.cb + vals.venta + vals.otro_venta;
+      const deposito = vals.abono1 + vals.abono2 + vals.abono3;
+      vals.cb_next = vals.total_venta - vals.gastos - deposito - vals.tarjeta - vals.mayoreo;
+      const rows = await sql`
+        UPDATE daily_sales SET
+          cb=${vals.cb}, venta=${vals.venta}, otro_venta=${vals.otro_venta},
+          total_venta=${vals.total_venta}, gastos=${vals.gastos},
+          abono1=${vals.abono1}, abono2=${vals.abono2}, abono3=${vals.abono3},
+          tarjeta=${vals.tarjeta}, mayoreo=${vals.mayoreo},
+          cb_next=${vals.cb_next}, deposito=${deposito},
+          updated_at=NOW()
+        WHERE id = ${id} RETURNING *`;
+      return ok(rows[0]);
+    }
+
     if (action === "update_caja") {
       const { id, abono, gasto, description } = body;
       const rows = await sql`

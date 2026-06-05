@@ -211,6 +211,16 @@ async function saveCaja(form) {
   await loadData('caja');
 }
 
+let editingSaleId = null;
+function startEditSale(id) { editingSaleId = id; render(); setTimeout(() => { const el = document.getElementById('es-gastos-'+id); if(el) el.focus(); }, 50); }
+function cancelEditSale() { editingSaleId = null; render(); }
+async function saveEditSale(id) {
+  const g = f => document.getElementById('es-'+f+'-'+id)?.value;
+  await post('save', { action:'update_daily_sales', id, gastos:g('gastos'), abono1:g('abono1'), abono2:g('abono2'), abono3:g('abono3'), tarjeta:g('tarjeta'), mayoreo:g('mayoreo') });
+  editingSaleId = null;
+  await loadData('daily_sales');
+}
+
 let editingCajaId = null;
 function startEditCaja(id) {
   editingCajaId = id;
@@ -440,25 +450,11 @@ function renderDailySales() {
       <div class="panel-hdr"><h3>${t('sales_history')}</h3></div>
       <div class="tbl-wrap">
         <table>
-          <thead><tr><th>${t('date')}</th><th>${t('store')}</th><th class="right">${t('cb')}</th><th class="right">${t('sales')}</th><th class="right">${t('other')}</th><th class="right">${t('total')}</th><th class="right">${t('expenses')}</th><th class="right">Abono1</th><th class="right">Abono2</th><th class="right">Abono3</th><th class="right">${t('card')}</th><th class="right">${t('transfer')}</th><th class="right">${t('cb_next')}</th><th class="right">${t('deposit_col')}</th><th>${t('source')}</th></tr></thead>
-          <tbody>${state.dailySales.map(r => `
-            <tr>
-              <td class="mono bold">${r.sale_date?.slice(0,10)||''}</td>
-              <td>${storeTag(r.store)}</td>
-              <td class="right mono">${fmtN(r.cb)}</td>
-              <td class="right mono bold green-text">${fmt(r.venta)}</td>
-              <td class="right mono">${fmt(r.otro_venta)}</td>
-              <td class="right mono bold">${fmt(r.total_venta)}</td>
-              <td class="right mono red-text">${fmt(r.gastos)}</td>
-              <td class="right mono">${fmt(r.abono1)}</td>
-              <td class="right mono">${fmt(r.abono2)}</td>
-              <td class="right mono">${fmt(r.abono3)}</td>
-              <td class="right mono">${fmt(r.tarjeta)}</td>
-              <td class="right mono">${fmt(r.mayoreo)}</td>
-              <td class="right mono blue-text">${fmtN(r.cb_next)}</td>
-              <td class="right mono bold blue-text">${fmt(r.deposito)}</td>
-              <td><span class="badge ${r.source==='corte'?'badge-purple':'badge-blue'}">${r.source||'manual'}</span></td>
-            </tr>`).join('')}
+          <thead><tr><th>${t('date')}</th><th>${t('store')}</th><th class="right">${t('cb')}</th><th class="right">${t('sales')}</th><th class="right">${t('total')}</th><th class="right">${t('expenses')}</th><th class="right">Abono1</th><th class="right">Abono2</th><th class="right">Abono3</th><th class="right">${t('card')}</th><th class="right">${t('transfer')}</th><th class="right">${t('cb_next')}</th><th class="right">${t('deposit_col')}</th><th>${t('source')}</th><th></th></tr></thead>
+          <tbody>${state.dailySales.map(r => editingSaleId==r.id ?
+            '<tr style="background:#eff4ff"><td class="mono bold">'+r.sale_date?.slice(0,10)+'</td><td>'+storeTag(r.store)+'</td><td class="right mono">'+fmtN(r.cb)+'</td><td class="right mono bold green-text">'+fmt(r.venta)+'</td><td class="right mono bold">'+fmt(r.total_venta)+'</td><td class="right"><input id="es-gastos-'+r.id+'" type="number" value="'+(Number(r.gastos)||0)+'" style="width:70px;padding:3px 5px;border:2px solid var(--red);border-radius:6px;font-family:monospace;font-size:11px;text-align:right"></td><td class="right"><input id="es-abono1-'+r.id+'" type="number" value="'+(Number(r.abono1)||0)+'" style="width:70px;padding:3px 5px;border:2px solid var(--green);border-radius:6px;font-family:monospace;font-size:11px;text-align:right"></td><td class="right"><input id="es-abono2-'+r.id+'" type="number" value="'+(Number(r.abono2)||0)+'" style="width:70px;padding:3px 5px;border:2px solid var(--green);border-radius:6px;font-family:monospace;font-size:11px;text-align:right"></td><td class="right"><input id="es-abono3-'+r.id+'" type="number" value="'+(Number(r.abono3)||0)+'" style="width:70px;padding:3px 5px;border:2px solid var(--green);border-radius:6px;font-family:monospace;font-size:11px;text-align:right"></td><td class="right"><input id="es-tarjeta-'+r.id+'" type="number" value="'+(Number(r.tarjeta)||0)+'" style="width:70px;padding:3px 5px;border:1px solid var(--border);border-radius:6px;font-family:monospace;font-size:11px;text-align:right"></td><td class="right"><input id="es-mayoreo-'+r.id+'" type="number" value="'+(Number(r.mayoreo)||0)+'" style="width:70px;padding:3px 5px;border:1px solid var(--border);border-radius:6px;font-family:monospace;font-size:11px;text-align:right"></td><td class="right mono">'+fmtN(r.cb_next)+'</td><td class="right mono bold blue-text">'+fmt(r.deposito)+'</td><td><span class="badge '+(r.source==='corte'?'badge-purple':'badge-blue')+'">'+r.source+'</span></td><td style="white-space:nowrap"><button class="btn btn-green btn-sm" onclick="saveEditSale('+r.id+')">&#10003;</button> <button class="btn btn-sm" onclick="cancelEditSale()">&#10005;</button></td></tr>'
+            : '<tr><td class="mono bold">'+(r.sale_date?.slice(0,10)||'')+'</td><td>'+storeTag(r.store)+'</td><td class="right mono">'+fmtN(r.cb)+'</td><td class="right mono bold green-text">'+fmt(r.venta)+'</td><td class="right mono bold">'+fmt(r.total_venta)+'</td><td class="right mono red-text">'+fmt(r.gastos)+'</td><td class="right mono">'+fmt(r.abono1)+'</td><td class="right mono">'+fmt(r.abono2)+'</td><td class="right mono">'+fmt(r.abono3)+'</td><td class="right mono">'+fmt(r.tarjeta)+'</td><td class="right mono">'+fmt(r.mayoreo)+'</td><td class="right mono blue-text">'+fmtN(r.cb_next)+'</td><td class="right mono bold blue-text">'+fmt(r.deposito)+'</td><td><span class="badge '+(r.source==='corte'?'badge-purple':'badge-blue')+'">'+(r.source||'manual')+'</span></td><td><button class="btn btn-sm" onclick="startEditSale('+r.id+')" style="font-size:10px;padding:2px 8px">&#9998;</button></td></tr>'
+          ).join('')}
           </tbody>
         </table>
       </div>
