@@ -16,25 +16,30 @@ exports.handler = async (event) => {
       const existing = await sql`SELECT * FROM daily_sales WHERE sale_date = ${sale_date} AND store = ${store} LIMIT 1`;
       const prev = existing[0] || {};
 
-      const cb = Number(body.cb) || Number(prev.cb) || 0;
-      const venta = Number(body.venta) || Number(prev.venta) || 0;
-      const otro = Number(otro_venta) || 0;
+      // A field left BLANK keeps the previous (Corte) value; an explicit 0 is respected.
+      const given = v => v !== undefined && v !== null && v !== '';
+      const pick = (bodyVal, prevVal) => given(bodyVal) ? (Number(bodyVal) || 0) : (Number(prevVal) || 0);
+
+      const cb = pick(body.cb, prev.cb);
+      const venta = pick(body.venta, prev.venta);
+      const otro = pick(otro_venta, prev.otro_venta);
       const total_venta = cb + venta + otro;
-      const g = Number(gastos) || Number(prev.gastos) || 0;
-      const a1 = Number(abono1) || 0;
-      const a2 = Number(abono2) || 0;
-      const a3 = Number(abono3) || 0;
-      const tarjeta = Number(body.tarjeta) || Number(prev.tarjeta) || 0;
-      const mayoreo = Number(body.mayoreo) || Number(prev.mayoreo) || 0;
+      const g = pick(gastos, prev.gastos);
+      const gastosManual = given(gastos) && Number(gastos) !== Number(prev.gastos || 0) ? true : (prev.gastos_manual || false);
+      const a1 = pick(abono1, prev.abono1);
+      const a2 = pick(abono2, prev.abono2);
+      const a3 = pick(abono3, prev.abono3);
+      const tarjeta = pick(body.tarjeta, prev.tarjeta);
+      const mayoreo = pick(body.mayoreo, prev.mayoreo);
       const deposito = a1 + a2 + a3;
       const cb_next = Number(prev.cb_next) || (total_venta - g - deposito - tarjeta - mayoreo);
 
       const rows = await sql`
-        INSERT INTO daily_sales (sale_date, store, cb, venta, otro_venta, total_venta, gastos, abono1, abono2, abono3, tarjeta, mayoreo, cb_next, deposito, source)
-        VALUES (${sale_date}, ${store}, ${cb}, ${venta}, ${otro}, ${total_venta}, ${g}, ${a1}, ${a2}, ${a3}, ${tarjeta}, ${mayoreo}, ${cb_next}, ${deposito}, ${prev.source || 'manual'})
+        INSERT INTO daily_sales (sale_date, store, cb, venta, otro_venta, total_venta, gastos, gastos_manual, abono1, abono2, abono3, tarjeta, mayoreo, cb_next, deposito, source)
+        VALUES (${sale_date}, ${store}, ${cb}, ${venta}, ${otro}, ${total_venta}, ${g}, ${gastosManual}, ${a1}, ${a2}, ${a3}, ${tarjeta}, ${mayoreo}, ${cb_next}, ${deposito}, ${prev.source || 'manual'})
         ON CONFLICT (sale_date, store) DO UPDATE SET
           cb = EXCLUDED.cb, venta = EXCLUDED.venta, otro_venta = EXCLUDED.otro_venta,
-          total_venta = EXCLUDED.total_venta, gastos = EXCLUDED.gastos,
+          total_venta = EXCLUDED.total_venta, gastos = EXCLUDED.gastos, gastos_manual = EXCLUDED.gastos_manual,
           abono1 = EXCLUDED.abono1, abono2 = EXCLUDED.abono2, abono3 = EXCLUDED.abono3,
           tarjeta = EXCLUDED.tarjeta, mayoreo = EXCLUDED.mayoreo,
           cb_next = EXCLUDED.cb_next, deposito = EXCLUDED.deposito,
@@ -78,15 +83,28 @@ exports.handler = async (event) => {
       vals.total_venta = vals.cb + vals.venta + vals.otro_venta;
       const deposito = vals.abono1 + vals.abono2 + vals.abono3;
       vals.cb_next = vals.total_venta - vals.gastos - deposito - vals.tarjeta - vals.mayoreo;
+      const gastosManual = body.gastos !== undefined && Number(body.gastos) !== Number(row.gastos || 0) ? true : (row.gastos_manual || false);
       const rows = await sql`
         UPDATE daily_sales SET
           cb=${vals.cb}, venta=${vals.venta}, otro_venta=${vals.otro_venta},
-          total_venta=${vals.total_venta}, gastos=${vals.gastos},
+          total_venta=${vals.total_venta}, gastos=${vals.gastos}, gastos_manual=${gastosManual},
           abono1=${vals.abono1}, abono2=${vals.abono2}, abono3=${vals.abono3},
           tarjeta=${vals.tarjeta}, mayoreo=${vals.mayoreo},
           cb_next=${vals.cb_next}, deposito=${deposito},
           updated_at=NOW()
         WHERE id = ${id} RETURNING *`;
+
+      // Keep Caja "abono tienda" in sync when Abonos are edited here
+      const saleDate = row.sale_date;
+      const allSales = await sql`SELECT abono1, abono2, abono3 FROM daily_sales WHERE sale_date = ${saleDate}`;
+      const totalCash = allSales.reduce((s, r2) => s + (Number(r2.abono1)||0) + (Number(r2.abono2)||0) + (Number(r2.abono3)||0), 0);
+      const cajaRow = await sql`SELECT id FROM caja WHERE tx_date = ${saleDate} AND LOWER(account) = 'tienda centro' AND LOWER(description) = 'abono tienda' LIMIT 1`;
+      if (cajaRow.length > 0) {
+        await sql`UPDATE caja SET abono = ${totalCash}, updated_at = NOW() WHERE id = ${cajaRow[0].id}`;
+      } else if (totalCash > 0) {
+        await sql`INSERT INTO caja (tx_date, category, account, description, abono, gasto, saldo) VALUES (${saleDate}, 'Abono', 'Tienda Centro', 'abono tienda', ${totalCash}, 0, 0)`;
+      }
+
       return ok(rows[0]);
     }
 
@@ -161,9 +179,13 @@ exports.handler = async (event) => {
 
     if (action === "delete_row") {
       const { table, id } = body;
-      const allowed = ["caja", "caja_fuerte", "nomina", "prestamos", "valle_control", "daily_sales"];
-      if (!allowed.includes(table)) return err("Cannot delete from " + table, 400);
-      await sql`DELETE FROM ${sql(table)} WHERE id = ${id}`;
+      if (table === "caja") await sql`DELETE FROM caja WHERE id = ${id}`;
+      else if (table === "caja_fuerte") await sql`DELETE FROM caja_fuerte WHERE id = ${id}`;
+      else if (table === "nomina") await sql`DELETE FROM nomina WHERE id = ${id}`;
+      else if (table === "prestamos") await sql`DELETE FROM prestamos WHERE id = ${id}`;
+      else if (table === "valle_control") await sql`DELETE FROM valle_control WHERE id = ${id}`;
+      else if (table === "daily_sales") await sql`DELETE FROM daily_sales WHERE id = ${id}`;
+      else return err("Cannot delete from " + table, 400);
       return ok({ deleted: true });
     }
 

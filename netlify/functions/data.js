@@ -18,15 +18,17 @@ exports.handler = async (event) => {
     if (table === "caja") {
       const from = params.from || "2026-01-01";
       const to = params.to || "2099-12-31";
-      // Calculate running balance dynamically so it's always correct
+      // Calculate running balance dynamically so it's always correct.
+      // Ordered by tx_date (then id) so catch-up entries for older dates
+      // slot into the right place in the running balance.
       const rows = await sql`
         WITH running AS (
           SELECT id, tx_date, category, account, description, abono, gasto, created_at,
-            SUM(COALESCE(abono,0) - COALESCE(gasto,0)) OVER (ORDER BY id) as saldo
+            SUM(COALESCE(abono,0) - COALESCE(gasto,0)) OVER (ORDER BY tx_date, id) as saldo
           FROM caja
         )
         SELECT * FROM running WHERE tx_date >= ${from} AND tx_date <= ${to}
-        ORDER BY id DESC LIMIT ${limit} OFFSET ${offset}`;
+        ORDER BY tx_date DESC, id DESC LIMIT ${limit} OFFSET ${offset}`;
       const bal = await sql`SELECT SUM(COALESCE(abono,0) - COALESCE(gasto,0)) as saldo FROM caja`;
       return ok({ rows, balance: bal[0]?.saldo || 0 });
     }

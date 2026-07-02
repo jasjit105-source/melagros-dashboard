@@ -30,53 +30,52 @@ function parseAmount(text, pattern) {
   return Number(match[1].replace(/,/g, '')) || 0;
 }
 
+// Parse ONE register's receipt text
+function parseOneRegister(text) {
+  return {
+    cb: parseAmount(text, /Inicial en Caja:\s*\$?([\d,]+(?:\.\d+)?)/i),
+    venta: parseAmount(text, /Ingresos por Ventas:\s*\$?([\d,]+(?:\.\d+)?)/i),
+    totalIngresos: parseAmount(text, /Total de Ingresos:\s*\$?([\d,]+(?:\.\d+)?)/i),
+    tarjeta: parseAmount(text, /Total en Tarjetas:\s*\$?([\d,]+(?:\.\d+)?)/i),
+    transfer: parseAmount(text, /Total en Transfer:\s*\$?([\d,]+(?:\.\d+)?)/i),
+    efectivo: parseAmount(text, /Total en Efectivo:\s*\$?([\d,]+(?:\.\d+)?)/i),
+    cobranza: parseAmount(text, /Ingresos por cobranza:\s*\$?([\d,]+(?:\.\d+)?)/i),
+    sumaGastos: parseAmount(text, /Suma de Gastos:\s*\$?([\d,]+(?:\.\d+)?)/i),
+    sumaRetiro: parseAmount(text, /Suma de Retiro:\s*\$?([\d,]+(?:\.\d+)?)/i),
+    totalEgresos: parseAmount(text, /Total de Egresos:\s*\$?([\d,]+(?:\.\d+)?)/i),
+    totalDepositos: parseAmount(text, /Total Depositos:\s*\$?([\d,]+(?:\.\d+)?)/i),
+    totalEnCaja: parseAmount(text, /Total en caja:\s*\$?([\d,]+(?:\.\d+)?)/i),
+  };
+}
+
+// A store can close the register more than once in a day (Corte Z #n, #n+1).
+// Parse each register separately and SUM — a single joined-text regex would
+// only capture the first receipt and undercount the day.
 function parseCorteReceipt(data) {
-  const allText = data.map(r => r.cadenaSalida || '').join('\n');
-
-  // === INGRESOS ===
-  const cb = parseAmount(allText, /Inicial en Caja:\s*\$?([\d,]+(?:\.\d+)?)/i);
-  const venta = parseAmount(allText, /Ingresos por Ventas:\s*\$?([\d,]+(?:\.\d+)?)/i);
-  const totalIngresos = parseAmount(allText, /Total de Ingresos:\s*\$?([\d,]+(?:\.\d+)?)/i);
-  const tarjeta = parseAmount(allText, /Total en Tarjetas:\s*\$?([\d,]+(?:\.\d+)?)/i);
-  const transfer = parseAmount(allText, /Total en Transfer:\s*\$?([\d,]+(?:\.\d+)?)/i);
-  const efectivo = parseAmount(allText, /Total en Efectivo:\s*\$?([\d,]+(?:\.\d+)?)/i);
-  const cobranza = parseAmount(allText, /Ingresos por cobranza:\s*\$?([\d,]+(?:\.\d+)?)/i);
-
-  // === EGRESOS — separate gastos from retiros ===
-  const sumaGastos = parseAmount(allText, /Suma de Gastos:\s*\$?([\d,]+(?:\.\d+)?)/i);
-  const sumaRetiro = parseAmount(allText, /Suma de Retiro:\s*\$?([\d,]+(?:\.\d+)?)/i);
-  const totalEgresos = parseAmount(allText, /Total de Egresos:\s*\$?([\d,]+(?:\.\d+)?)/i);
-
-  // === DEPOSITOS BANCARIOS ===
-  const totalDepositos = parseAmount(allText, /Total Depositos:\s*\$?([\d,]+(?:\.\d+)?)/i);
-
-  // === TOTAL EN CAJA (cash left for tomorrow = cb_next) ===
-  const totalEnCaja = parseAmount(allText, /Total en caja:\s*\$?([\d,]+(?:\.\d+)?)/i);
-
-  // === CORTE NUMBER ===
-  const corteNum = data[0]?.numeroCorte || 0;
+  const regs = data.map(r => parseOneRegister(r.cadenaSalida || ''));
+  const sum = key => regs.reduce((a, r) => a + (r[key] || 0), 0);
 
   // DB fields as fallback
   const totalCajaDB = data.reduce((a, r) => a + (Number(r.totalCaja) || 0), 0);
   const totalIngresosDB = data.reduce((a, r) => a + (Number(r.totalIngresos) || 0), 0);
 
   return {
-    corte_num: corteNum,
-    cb,
-    venta: venta || 0,
-    total_venta: totalIngresos || totalIngresosDB,
-    tarjeta,
-    transfer,
-    efectivo,
-    cobranza,
+    corte_num: data[0]?.numeroCorte || 0,
+    // CB = opening cash of the FIRST register of the day
+    cb: regs[0]?.cb || 0,
+    venta: sum('venta'),
+    total_venta: sum('totalIngresos') || totalIngresosDB,
+    tarjeta: sum('tarjeta'),
+    transfer: sum('transfer'),
+    efectivo: sum('efectivo'),
+    cobranza: sum('cobranza'),
     // Gastos = only store expenses (parking, shipping, etc), NOT retiros
-    gastos: sumaGastos,
-    retiro: sumaRetiro,
-    total_egresos: totalEgresos,
-    // Depositos bancarios from the receipt
-    depositos_bancarios: totalDepositos,
-    // Cash left in register = tomorrow's CB
-    cb_next: totalEnCaja || totalCajaDB,
+    gastos: sum('sumaGastos'),
+    retiro: sum('sumaRetiro'),
+    total_egresos: sum('totalEgresos'),
+    depositos_bancarios: sum('totalDepositos'),
+    // Cash left for tomorrow = LAST register's "Total en caja"
+    cb_next: regs[regs.length - 1]?.totalEnCaja || totalCajaDB,
     registers: data.length,
   };
 }
@@ -120,7 +119,8 @@ exports.handler = async (event) => {
           cb = EXCLUDED.cb,
           venta = EXCLUDED.venta,
           total_venta = EXCLUDED.total_venta,
-          gastos = EXCLUDED.gastos,
+          -- Keep a manually-corrected gastos; otherwise take the Corte's value
+          gastos = CASE WHEN COALESCE(daily_sales.gastos_manual, FALSE) THEN daily_sales.gastos ELSE EXCLUDED.gastos END,
           tarjeta = EXCLUDED.tarjeta,
           mayoreo = EXCLUDED.mayoreo,
           cb_next = EXCLUDED.cb_next,
