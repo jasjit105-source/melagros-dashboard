@@ -49,10 +49,10 @@ exports.handler = async (event) => {
       // Auto-update Caja "abono tienda" with total cash (Abono1+2+3) from ALL stores
       const allSales = await sql`SELECT abono1, abono2, abono3 FROM daily_sales WHERE sale_date = ${sale_date}`;
       const totalCash = allSales.reduce((sum, s) => sum + (Number(s.abono1)||0) + (Number(s.abono2)||0) + (Number(s.abono3)||0), 0);
-      const existingCaja = await sql`SELECT id FROM caja WHERE tx_date = ${sale_date} AND LOWER(account) = 'tienda centro' AND LOWER(description) = 'abono tienda' LIMIT 1`;
-      if (existingCaja.length > 0) {
+      const existingCaja = await sql`SELECT id, manual_edit FROM caja WHERE tx_date = ${sale_date} AND LOWER(account) = 'tienda centro' AND LOWER(description) = 'abono tienda' LIMIT 1`;
+      if (existingCaja.length > 0 && !existingCaja[0].manual_edit) {
         await sql`UPDATE caja SET abono = ${totalCash}, updated_at = NOW() WHERE id = ${existingCaja[0].id}`;
-      } else if (totalCash > 0) {
+      } else if (!existingCaja.length && totalCash > 0) {
         const lb = await sql`SELECT saldo FROM caja ORDER BY id DESC LIMIT 1`;
         await sql`INSERT INTO caja (tx_date, category, account, description, abono, gasto, saldo) VALUES (${sale_date}, 'Abono', 'Tienda Centro', 'abono tienda', ${totalCash}, 0, ${(Number(lb[0]?.saldo)||0) + totalCash})`;
       }
@@ -98,10 +98,10 @@ exports.handler = async (event) => {
       const saleDate = row.sale_date;
       const allSales = await sql`SELECT abono1, abono2, abono3 FROM daily_sales WHERE sale_date = ${saleDate}`;
       const totalCash = allSales.reduce((s, r2) => s + (Number(r2.abono1)||0) + (Number(r2.abono2)||0) + (Number(r2.abono3)||0), 0);
-      const cajaRow = await sql`SELECT id FROM caja WHERE tx_date = ${saleDate} AND LOWER(account) = 'tienda centro' AND LOWER(description) = 'abono tienda' LIMIT 1`;
-      if (cajaRow.length > 0) {
+      const cajaRow = await sql`SELECT id, manual_edit FROM caja WHERE tx_date = ${saleDate} AND LOWER(account) = 'tienda centro' AND LOWER(description) = 'abono tienda' LIMIT 1`;
+      if (cajaRow.length > 0 && !cajaRow[0].manual_edit) {
         await sql`UPDATE caja SET abono = ${totalCash}, updated_at = NOW() WHERE id = ${cajaRow[0].id}`;
-      } else if (totalCash > 0) {
+      } else if (!cajaRow.length && totalCash > 0) {
         await sql`INSERT INTO caja (tx_date, category, account, description, abono, gasto, saldo) VALUES (${saleDate}, 'Abono', 'Tienda Centro', 'abono tienda', ${totalCash}, 0, 0)`;
       }
 
@@ -115,6 +115,7 @@ exports.handler = async (event) => {
           abono = ${Number(abono)||0},
           gasto = ${Number(gasto)||0},
           description = COALESCE(${description}, description),
+          manual_edit = TRUE,
           updated_at = NOW()
         WHERE id = ${id}
         RETURNING *`;

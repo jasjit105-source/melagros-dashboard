@@ -180,12 +180,15 @@ exports.handler = async (event) => {
       async function upsertCaja(category, account, description, gasto) {
         // Check if entry already exists for this date + account (case-insensitive)
         const existing = await sql`
-          SELECT id FROM caja
+          SELECT id, manual_edit FROM caja
           WHERE tx_date = ${fecha} AND LOWER(account) = LOWER(${account}) AND LOWER(description) = LOWER(${description})
           LIMIT 1`;
 
         if (existing.length > 0) {
-          // Update existing — recalculate saldo from scratch after
+          // Never overwrite an amount the girls edited by hand
+          if (existing[0].manual_edit) {
+            return { action: 'kept (manually edited)', id: existing[0].id };
+          }
           await sql`
             UPDATE caja SET gasto = ${gasto}, updated_at = NOW()
             WHERE id = ${existing[0].id}`;
@@ -202,10 +205,12 @@ exports.handler = async (event) => {
 
       // Post "abono tienda" — CASH ONLY (sum of Abono1+2+3 from all stores)
       const existingAbono = await sql`
-        SELECT id FROM caja
+        SELECT id, manual_edit FROM caja
         WHERE tx_date = ${fecha} AND LOWER(account) = 'tienda centro' AND LOWER(description) = 'abono tienda'
         LIMIT 1`;
-      if (existingAbono.length > 0) {
+      if (existingAbono.length > 0 && existingAbono[0].manual_edit) {
+        cajaEntries.push({ type: 'abono tienda (cash)', action: 'kept (manually edited)' });
+      } else if (existingAbono.length > 0) {
         await sql`UPDATE caja SET abono = ${totalCashDeposit}, updated_at = NOW() WHERE id = ${existingAbono[0].id}`;
         cajaEntries.push({ type: 'abono tienda (cash)', amount: totalCashDeposit, action: 'updated' });
       } else {
